@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 const User = require('../models/User');
 
 // Get all users (for admin)
-router.get('/admin/users', auth, async (req, res) => {
+router.get('/admin/users', auth, authorize('admin'), async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ msg: 'Access denied. Admin privileges required.' });
-    }
     const users = await User.find().select('-password');
     res.json(users);
   } catch (error) {
@@ -18,11 +15,8 @@ router.get('/admin/users', auth, async (req, res) => {
 });
 
 // Get users for staff
-router.get('/staff/users', auth, async (req, res) => {
+router.get('/staff/users', auth, authorize(['staff', 'admin']), async (req, res) => {
   try {
-    if (req.user.role !== 'staff' && req.user.role !== 'admin') {
-      return res.status(403).json({ msg: 'Access denied. Staff privileges required.' });
-    }
     const users = await User.find({ role: { $in: ['student', 'staff'] } }).select('-password');
     res.json(users);
   } catch (error) {
@@ -32,7 +26,7 @@ router.get('/staff/users', auth, async (req, res) => {
 });
 
 // Get users for students
-router.get('/users', auth, async (req, res) => {
+router.get('/users', auth, authorize('student'), async (req, res) => {
   try {
     // Students can see staff members and other students
     const users = await User.find({
