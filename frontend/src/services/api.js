@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with consistent configuration
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://mnit-laundry-management-system-backend.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },

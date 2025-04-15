@@ -3,7 +3,7 @@ import axios from 'axios';
 import API from '../services/api';
 
 // Set base URL for API requests
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'https://mnit-laundry-management-system-backend.onrender.com/api';
 // Allow cookies to be sent with requests
 axios.defaults.withCredentials = true;
 
