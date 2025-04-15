@@ -104,14 +104,14 @@ exports.login = async (req, res) => {
     // Check if user exists
     const user = await User.findOne({ email }).populate('hostel', 'name');
     if (!user) {
-      console.log('User not found');
+      console.log('User not found:', email);
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      console.log('Password incorrect');
+      console.log('Password incorrect for user:', email);
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
@@ -123,6 +123,8 @@ exports.login = async (req, res) => {
     
     const token = generateToken(payload);
     const refreshToken = generateRefreshToken(payload);
+
+    console.log('Tokens generated successfully');
 
     // Set CORS headers explicitly
     const clientOrigin = req.headers.origin || 'http://localhost:3000';
@@ -155,8 +157,12 @@ exports.login = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Login error:', err.message);
-    res.status(500).send('Server error');
+    console.error('Login error:', err);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ 
+      msg: 'Server error during login',
+      error: err.message 
+    });
   }
 };
 
