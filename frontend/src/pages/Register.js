@@ -149,13 +149,33 @@ const Register = () => {
     setAlertError('');
     
     try {
+      console.log('Submitting registration data:', formData);
+      
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...registerData } = formData;
-      await register(registerData);
+      
+      // Log the data being sent to the API
+      console.log('Sending registration data to API:', registerData);
+      
+      const response = await register(registerData);
+      console.log('Registration successful:', response);
+      
+      // Show success message
+      setAlertError('');
+      
+      // Navigate to dashboard after successful registration
       navigate('/dashboard');
     } catch (err) {
       console.error('Registration error:', err);
-      setAlertError(error || 'Registration failed. Please try again.');
+      
+      // Extract error message from the error object
+      const errorMessage = err.response?.data?.msg || err.message || 'Registration failed. Please try again.';
+      setAlertError(errorMessage);
+      
+      // If there are validation errors from the server, update form errors
+      if (err.response?.data?.details) {
+        setFormErrors(err.response.data.details);
+      }
     } finally {
       setSubmitting(false);
     }

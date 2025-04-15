@@ -32,4 +32,4 @@ router.delete('/:id', [auth, authorize(['admin'])], deleteMachine);
 // Get machine maintenance history (staff and admin)
 router.get('/:id/maintenance', [auth, authorize(['staff', 'admin'])], getMachineMaintenanceHistory);
 
-module.exports = router;
+module.exports = router; 

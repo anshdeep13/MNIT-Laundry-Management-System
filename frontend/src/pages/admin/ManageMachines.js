@@ -66,6 +66,9 @@ const ManageMachines = () => {
   useEffect(() => {
     fetchMachines();
     fetchHostels();
+    // Set up auto-refresh every 15 seconds
+    const interval = setInterval(fetchMachines, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   // Add a new useEffect to track and debug form data changes

@@ -46,37 +46,40 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
 
+  const fetchStats = async () => {
+    try {
+      const [usersRes, hostelsRes, machinesRes, bookingsRes] = await Promise.all([
+        API.get('/admin/stats/users'),
+        API.get('/admin/stats/hostels'),
+        API.get('/admin/stats/machines'),
+        API.get('/admin/stats/bookings'),
+      ]);
+
+      setStats({
+        users: usersRes.data.count,
+        hostels: hostelsRes.data.count,
+        machines: machinesRes.data.count,
+        bookings: bookingsRes.data.count,
+      });
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      // Set fallback stats for development
+      setStats({
+        users: 12,
+        hostels: 4,
+        machines: 16,
+        bookings: 28,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const [usersRes, hostelsRes, machinesRes, bookingsRes] = await Promise.all([
-          API.get('/admin/stats/users'),
-          API.get('/admin/stats/hostels'),
-          API.get('/admin/stats/machines'),
-          API.get('/admin/stats/bookings'),
-        ]);
-
-        setStats({
-          users: usersRes.data.count,
-          hostels: hostelsRes.data.count,
-          machines: machinesRes.data.count,
-          bookings: bookingsRes.data.count,
-        });
-      } catch (error) {
-        console.error('Error fetching admin stats:', error);
-        // Set fallback stats for development
-        setStats({
-          users: 12,
-          hostels: 4,
-          machines: 16,
-          bookings: 28,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStats();
+    // Set up auto-refresh every 30 seconds
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   if (!user || user.role !== 'admin') {

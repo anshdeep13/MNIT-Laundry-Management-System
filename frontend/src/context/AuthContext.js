@@ -146,22 +146,37 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const res = await axios.post('/auth/register', userData);
+      setLoading(true);
+      setError(null);
+      
+      console.log('AuthContext: Attempting registration...', userData);
+      
+      // Use the API service instead of direct axios call
+      const res = await API.post('/auth/register', userData);
+      
+      console.log('AuthContext: Registration response received:', res.data);
       
       // Set token in local storage
       localStorage.setItem('token', res.data.token);
       
-      // Set auth token header
+      // Set auth token header for all axios requests
       axios.defaults.headers.common['x-auth-token'] = res.data.token;
+      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      
+      console.log('AuthContext: Token set in headers and localStorage');
       
       // Set user state
       setUser(res.data.user);
-      setError(null);
+      
+      console.log('AuthContext: User state updated:', res.data.user);
       
       return res.data.user;
     } catch (err) {
+      console.error('Registration failed:', err);
       setError(err.response?.data?.msg || 'Registration failed');
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 

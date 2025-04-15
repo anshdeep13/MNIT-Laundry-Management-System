@@ -5,7 +5,20 @@ const { generateToken, generateRefreshToken } = require('../utils/jwtGenerator')
 // Register a new user
 exports.register = async (req, res) => {
   try {
+    console.log('Registration request received:', req.body);
     const { name, email, password, roomNumber, role, hostel, contactNumber } = req.body;
+    
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        msg: 'Missing required fields',
+        details: {
+          name: !name ? 'Name is required' : null,
+          email: !email ? 'Email is required' : null,
+          password: !password ? 'Password is required' : null
+        }
+      });
+    }
     
     // Check if user exists
     let user = await User.findOne({ email });
@@ -34,6 +47,7 @@ exports.register = async (req, res) => {
     user.password = await bcrypt.hash(password, salt);
     
     await user.save();
+    console.log('User created successfully:', user._id);
 
     // Generate JWT tokens
     const payload = { 
@@ -48,10 +62,11 @@ exports.register = async (req, res) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      secure: process.env.NODE_ENV === 'production', // Only use HTTPS in production
-      sameSite: 'strict'
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
     });
 
+    // Send response
     res.status(201).json({ 
       token,
       user: {
@@ -65,8 +80,11 @@ exports.register = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error('Registration error:', err);
+    res.status(500).json({ 
+      msg: 'Server error during registration',
+      error: err.message 
+    });
   }
 };
 
@@ -106,19 +124,20 @@ exports.login = async (req, res) => {
     const token = generateToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    // Set HTTP-only cookie with refresh token
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
-      sameSite: 'lax' // Changed from strict to lax for cross-site access
-    });
-
     // Set CORS headers explicitly
     const clientOrigin = req.headers.origin || 'http://localhost:3000';
     res.header('Access-Control-Allow-Origin', clientOrigin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, x-auth-token, Authorization');
+
+    // Set HTTP-only cookie with refresh token
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
+      sameSite: 'lax', // Changed from strict to lax for cross-site access
+      path: '/' // Ensure cookie is available across all paths
+    });
 
     console.log('Login successful, sending response with token');
     console.log('Response headers:', res.getHeaders());

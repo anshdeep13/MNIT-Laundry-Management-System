@@ -1,11 +1,13 @@
 const express = require('express');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
-const hostelRoutes = require('./routes/hostel');
-const machineRoutes = require('./routes/machine');
-const bookingRoutes = require('./routes/booking');
+const hostelRoutes = require('./routes/hostels');
+const machineRoutes = require('./routes/machines');
+const bookingRoutes = require('./routes/bookings');
 const adminRoutes = require('./routes/admin');
-const staffRoutes = require('./routes/staffRoutes.js');
+const staffRoutes = require('./routes/staff');
+const messageRoutes = require('./routes/messages');
+const userRoutes = require('./routes/users');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
@@ -17,24 +19,10 @@ connectDB();
 
 // Set up detailed CORS options
 const corsOptions = {
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      process.env.CLIENT_URL
-    ].filter(Boolean); // Filter out undefined values
-    
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked request from:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'x-auth-token', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token']
 };
 
 // Apply CORS middleware
@@ -72,6 +60,8 @@ app.use('/api/machines', machineRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api', userRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

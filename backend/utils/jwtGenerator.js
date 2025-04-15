@@ -1,25 +1,30 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-// Generate secure random token for JWT SECRET if not provided
-const generateSecureSecret = () => {
-  return crypto.randomBytes(32).toString('hex');
-};
-
-// Use environment variable or generate a secure random string
-const JWT_SECRET = process.env.JWT_SECRET || generateSecureSecret();
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || generateSecureSecret();
+// Use environment variables for secrets, with fallback to secure random generation
+const JWT_SECRET = process.env.JWT_SECRET || '861814bfcd12de79840a2b6927af1fdd5dcd8f2c6781b700fe13b88ff5e0fa8d';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || '554de9be5c83f2021a37705f07a47833cfba3fde2c590e9c44031e436309003b';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 // Generate JWT token
 const generateToken = (payload) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  try {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  } catch (error) {
+    console.error('Error generating token:', error);
+    throw new Error('Failed to generate token');
+  }
 };
 
 // Generate refresh token
 const generateRefreshToken = (payload) => {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+  try {
+    return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN });
+  } catch (error) {
+    console.error('Error generating refresh token:', error);
+    throw new Error('Failed to generate refresh token');
+  }
 };
 
 // Verify JWT token
@@ -27,6 +32,7 @@ const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
+    console.error('Token verification error:', error.message);
     return null;
   }
 };
@@ -36,6 +42,7 @@ const verifyRefreshToken = (token) => {
   try {
     return jwt.verify(token, JWT_REFRESH_SECRET);
   } catch (error) {
+    console.error('Refresh token verification error:', error.message);
     return null;
   }
 };

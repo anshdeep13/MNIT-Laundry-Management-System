@@ -20,6 +20,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "nodemailer": "^6.10.1",
+    "razorpay": "^2.9.6"
   }
-} 
+}

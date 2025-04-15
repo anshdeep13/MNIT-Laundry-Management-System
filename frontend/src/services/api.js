@@ -21,10 +21,12 @@ API.interceptors.request.use((config) => {
   console.log('API Request:', {
     url: config.url,
     method: config.method,
-    headers: config.headers
+    headers: config.headers,
+    data: config.data
   });
   return config;
 }, (error) => {
+  console.error('API Request Error:', error);
   return Promise.reject(error);
 });
 
@@ -32,21 +34,46 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (response) => {
     console.log('API Response:', {
+      url: response.config.url,
       status: response.status,
-      data: response.data
+      statusText: response.statusText,
+      data: response.data,
+      headers: response.headers
     });
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error('API Error:', {
       message: error.message,
+      config: error.config,
       response: error.response ? {
         status: error.response.status,
-        data: error.response.data
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers
       } : 'No response',
-      request: error.request ? 'Request was made but no response received' : 'Request not sent'
+      request: error.request ? {
+        responseURL: error.request.responseURL,
+        status: error.request.status,
+        statusText: error.request.statusText,
+        response: error.request.response
+      } : 'Request not sent'
     });
-    return Promise.reject(error);
+
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+
+    // Return a more detailed error message
+    return Promise.reject({
+      message: error.response?.data?.message || error.message || 'Unknown error',
+      status: error.response?.status,
+      data: error.response?.data
+    });
   }
 );
 
@@ -78,6 +105,27 @@ export const staffAPI = {
   
   // Change password
   changePassword: (data) => API.patch('/staff/change-password', data)
+};
+
+// Auth API functions
+export const authAPI = {
+  // Register a new user
+  register: (data) => API.post('/auth/register', data),
+  
+  // Login user
+  login: (data) => API.post('/auth/login', data),
+  
+  // Get current user
+  getCurrentUser: () => API.get('/auth/me'),
+  
+  // Update wallet balance
+  updateWallet: (data) => API.post('/auth/wallet', data),
+  
+  // Refresh token
+  refreshToken: () => API.post('/auth/refresh-token'),
+  
+  // Logout user
+  logout: () => API.post('/auth/logout'),
 };
 
 export default API;

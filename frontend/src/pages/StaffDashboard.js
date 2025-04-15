@@ -29,12 +29,25 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip
+  Chip,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { format } from 'date-fns';
 import { staffAPI } from '../services/api';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import BuildIcon from '@mui/icons-material/Build';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import PendingIcon from '@mui/icons-material/Pending';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PersonIcon from '@mui/icons-material/Person';
+import LocalLaundryServiceIcon from '@mui/icons-material/LocalLaundryService';
 
 // TabPanel component for tab content
 function TabPanel(props) {
@@ -91,30 +104,80 @@ const StaffDashboard = () => {
         setLoading(true);
         setError(null);
         
+        // Check if user is logged in
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('You are not logged in. Please log in to access the staff dashboard.');
+          setLoading(false);
+          return;
+        }
+        
+        console.log('Fetching data with token:', token);
+        
         // Fetch hostels
-        const hostelsResponse = await staffAPI.getHostels();
-        setHostels(hostelsResponse.data);
+        try {
+          const hostelsResponse = await staffAPI.getHostels();
+          setHostels(hostelsResponse.data);
+          console.log('Hostels fetched successfully:', hostelsResponse.data);
+        } catch (err) {
+          console.error('Error fetching hostels:', err);
+          setError(`Error fetching hostels: ${err.message}`);
+          setLoading(false);
+          return;
+        }
         
         // Fetch bookings by hostel
-        const bookingsByHostelResponse = await staffAPI.getBookingsByHostel();
-        setBookingsByHostel(bookingsByHostelResponse.data);
+        try {
+          const bookingsByHostelResponse = await staffAPI.getBookingsByHostel();
+          setBookingsByHostel(bookingsByHostelResponse.data);
+          console.log('Bookings by hostel fetched successfully:', bookingsByHostelResponse.data);
+        } catch (err) {
+          console.error('Error fetching bookings by hostel:', err);
+          setError(`Error fetching bookings by hostel: ${err.message}`);
+          setLoading(false);
+          return;
+        }
         
         // Fetch all bookings
-        const bookingsResponse = await staffAPI.getBookings();
-        setBookings(bookingsResponse.data);
+        try {
+          const bookingsResponse = await staffAPI.getBookings();
+          setBookings(bookingsResponse.data);
+          console.log('All bookings fetched successfully:', bookingsResponse.data);
+        } catch (err) {
+          console.error('Error fetching all bookings:', err);
+          setError(`Error fetching all bookings: ${err.message}`);
+          setLoading(false);
+          return;
+        }
         
         // Fetch machines by hostel
-        const machinesByHostelResponse = await staffAPI.getMachinesByHostel();
-        setMachinesByHostel(machinesByHostelResponse.data);
+        try {
+          const machinesByHostelResponse = await staffAPI.getMachinesByHostel();
+          setMachinesByHostel(machinesByHostelResponse.data);
+          console.log('Machines by hostel fetched successfully:', machinesByHostelResponse.data);
+        } catch (err) {
+          console.error('Error fetching machines by hostel:', err);
+          setError(`Error fetching machines by hostel: ${err.message}`);
+          setLoading(false);
+          return;
+        }
         
         // Fetch all machines
-        const machinesResponse = await staffAPI.getMachines();
-        setMachines(machinesResponse.data);
+        try {
+          const machinesResponse = await staffAPI.getMachines();
+          setMachines(machinesResponse.data);
+          console.log('All machines fetched successfully:', machinesResponse.data);
+        } catch (err) {
+          console.error('Error fetching all machines:', err);
+          setError(`Error fetching all machines: ${err.message}`);
+          setLoading(false);
+          return;
+        }
         
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again later.');
+        setError(`Failed to load data: ${err.message}. Please try again later.`);
         setLoading(false);
       }
     };
@@ -198,19 +261,36 @@ const StaffDashboard = () => {
       setLoading(true);
       setError(null);
       
-      const data = { status: newStatus };
-      if (newStatus === 'maintenance' && maintenanceNote) {
-        data.maintenanceNote = maintenanceNote;
+      if (!selectedMachine) {
+        setError('No machine selected');
+        setLoading(false);
+        return;
       }
       
-      await staffAPI.updateMachineStatus(selectedMachine._id, data);
+      const response = await staffAPI.updateMachineStatus(selectedMachine._id, {
+        status: newStatus,
+        maintenanceNote: maintenanceNote
+      });
       
-      // Refresh machines data
-      const machinesResponse = await staffAPI.getMachines();
-      setMachines(machinesResponse.data);
+      // Update machines list
+      const updatedMachines = machines.map(machine => 
+        machine._id === selectedMachine._id ? response.data : machine
+      );
+      setMachines(updatedMachines);
       
-      const machinesByHostelResponse = await staffAPI.getMachinesByHostel();
-      setMachinesByHostel(machinesByHostelResponse.data);
+      // Update machines by hostel
+      const updatedMachinesByHostel = machinesByHostel.map(hostelData => {
+        if (hostelData.hostel._id === selectedMachine.hostel) {
+          return {
+            ...hostelData,
+            machines: hostelData.machines.map(machine => 
+              machine._id === selectedMachine._id ? response.data : machine
+            )
+          };
+        }
+        return hostelData;
+      });
+      setMachinesByHostel(updatedMachinesByHostel);
       
       handleCloseDialog();
       setLoading(false);
@@ -226,69 +306,271 @@ const StaffDashboard = () => {
     return format(new Date(dateString), 'MMM dd, yyyy hh:mm a');
   };
   
-  // Get status color
+  // Get status color for chips
   const getStatusColor = (status) => {
     switch (status) {
-      case 'confirmed': return 'primary';
-      case 'in_progress': return 'info';
-      case 'completed': return 'success';
-      case 'cancelled': return 'error';
-      case 'available': return 'success';
-      case 'in_use': return 'warning';
-      case 'maintenance': return 'error';
-      case 'out-of-order': return 'error';
-      default: return 'default';
+      case 'completed':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'cancelled':
+        return 'error';
+      case 'in-progress':
+        return 'info';
+      default:
+        return 'default';
     }
   };
   
   // Get machine status chip
   const getMachineStatusChip = (status) => {
-    let label = status.replace('_', ' ');
-    if (status === 'out-of-order') {
-      label = 'Out of Order';
+    let color = 'default';
+    let icon = null;
+    
+    switch (status) {
+      case 'available':
+        color = 'success';
+        icon = <CheckCircleIcon fontSize="small" />;
+        break;
+      case 'in-use':
+        color = 'info';
+        icon = <AccessTimeIcon fontSize="small" />;
+        break;
+      case 'maintenance':
+        color = 'error';
+        icon = <BuildIcon fontSize="small" />;
+        break;
+      case 'offline':
+        color = 'default';
+        icon = <ErrorIcon fontSize="small" />;
+        break;
+      default:
+        break;
     }
     
     return (
       <Chip 
-        label={label} 
-        color={getStatusColor(status)} 
+        label={status.charAt(0).toUpperCase() + status.slice(1)} 
+        color={color} 
         size="small"
+        icon={icon}
       />
+    );
+  };
+  
+  // Render bookings by hostel
+  const renderBookingsByHostel = () => {
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+    
+    if (error) {
+      return (
+        <Alert severity="error" sx={{ my: 2 }}>
+          {error}
+        </Alert>
+      );
+    }
+    
+    if (bookingsByHostel.length === 0) {
+      return (
+        <Alert severity="info" sx={{ my: 2 }}>
+          No bookings found.
+        </Alert>
+      );
+    }
+    
+    return (
+      <Box>
+        {bookingsByHostel.map((hostelData) => (
+          <Accordion key={hostelData.hostel._id} defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">
+                {hostelData.hostel.name} - {hostelData.bookings.length} Bookings
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>User</TableCell>
+                      <TableCell>Machine</TableCell>
+                      <TableCell>Start Time</TableCell>
+                      <TableCell>End Time</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Payment</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {hostelData.bookings.map((booking) => (
+                      <TableRow key={booking._id}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <PersonIcon fontSize="small" sx={{ mr: 1 }} />
+                            {booking.user.name} (Room {booking.user.roomNumber})
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <LocalLaundryServiceIcon fontSize="small" sx={{ mr: 1 }} />
+                            {booking.machine.name}
+                          </Box>
+                        </TableCell>
+                        <TableCell>{formatDate(booking.startTime)}</TableCell>
+                        <TableCell>{formatDate(booking.endTime)}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={booking.status.charAt(0).toUpperCase() + booking.status.slice(1)} 
+                            color={getStatusColor(booking.status)} 
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={booking.paymentStatus} 
+                            color={booking.paymentStatus === 'paid' ? 'success' : 'warning'} 
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+        ))}
+      </Box>
+    );
+  };
+  
+  // Render machines by hostel
+  const renderMachinesByHostel = () => {
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+    
+    if (error) {
+      return (
+        <Alert severity="error" sx={{ my: 2 }}>
+          {error}
+        </Alert>
+      );
+    }
+    
+    if (machinesByHostel.length === 0) {
+      return (
+        <Alert severity="info" sx={{ my: 2 }}>
+          No machines found.
+        </Alert>
+      );
+    }
+    
+    return (
+      <Box>
+        {machinesByHostel.map((hostelData) => (
+          <Accordion key={hostelData.hostel._id} defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">
+                {hostelData.hostel.name} - {hostelData.machines.length} Machines
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={2}>
+                {hostelData.machines.map((machine) => (
+                  <Grid item xs={12} sm={6} md={4} key={machine._id}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="h6">
+                            {machine.name}
+                          </Typography>
+                          {getMachineStatusChip(machine.status)}
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Hostel: {machine.hostel.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Type: {machine.type}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          Last Maintenance: {machine.lastMaintenance ? formatDate(machine.lastMaintenance) : 'Never'}
+                        </Typography>
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Tooltip title="Update Status">
+                            <IconButton 
+                              size="small" 
+                              color="primary" 
+                              onClick={() => handleOpenDialog(machine)}
+                            >
+                              <BuildIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+        ))}
+      </Box>
     );
   };
   
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Staff Dashboard
-      </Typography>
-      
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      
-      <Paper sx={{ width: '100%', mb: 2 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="fullWidth"
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          Staff Dashboard
+        </Typography>
+        
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          indicatorColor="primary" 
+          textColor="primary" 
+          sx={{ mb: 3 }}
         >
-          <Tab label="All Bookings" />
           <Tab label="Bookings by Hostel" />
-          <Tab label="Machine Status" />
           <Tab label="Machines by Hostel" />
+          <Tab label="All Bookings" />
+          <Tab label="All Machines" />
         </Tabs>
         
-        {/* All Bookings Tab */}
         <TabPanel value={tabValue} index={0}>
+          <Typography variant="h5" gutterBottom>
+            Bookings by Hostel
+          </Typography>
+          {renderBookingsByHostel()}
+        </TabPanel>
+        
+        <TabPanel value={tabValue} index={1}>
+          <Typography variant="h5" gutterBottom>
+            Machines by Hostel
+          </Typography>
+          {renderMachinesByHostel()}
+        </TabPanel>
+        
+        <TabPanel value={tabValue} index={2}>
+          <Typography variant="h5" gutterBottom>
+            All Bookings
+          </Typography>
+          
           <Box sx={{ mb: 3 }}>
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth>
+                <FormControl fullWidth size="small">
                   <InputLabel>Hostel</InputLabel>
                   <Select
                     value={selectedHostel}
@@ -304,9 +586,8 @@ const StaffDashboard = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              
               <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth>
+                <FormControl fullWidth size="small">
                   <InputLabel>Status</InputLabel>
                   <Select
                     value={selectedStatus}
@@ -314,61 +595,63 @@ const StaffDashboard = () => {
                     onChange={(e) => setSelectedStatus(e.target.value)}
                   >
                     <MenuItem value="">All Statuses</MenuItem>
-                    <MenuItem value="confirmed">Confirmed</MenuItem>
-                    <MenuItem value="in_progress">In Progress</MenuItem>
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="in-progress">In Progress</MenuItem>
                     <MenuItem value="completed">Completed</MenuItem>
                     <MenuItem value="cancelled">Cancelled</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              
               <Grid item xs={12} sm={6} md={3}>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="Start Date"
                     value={startDate}
                     onChange={setStartDate}
-                    renderInput={(params) => <TextField {...params} fullWidth />}
+                    renderInput={(params) => <TextField {...params} size="small" fullWidth />}
                   />
                 </LocalizationProvider>
               </Grid>
-              
               <Grid item xs={12} sm={6} md={3}>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
                   <DatePicker
                     label="End Date"
                     value={endDate}
                     onChange={setEndDate}
-                    renderInput={(params) => <TextField {...params} fullWidth />}
+                    renderInput={(params) => <TextField {...params} size="small" fullWidth />}
                   />
                 </LocalizationProvider>
               </Grid>
+              <Grid item xs={12}>
+                <Button 
+                  variant="contained" 
+                  onClick={handleBookingFilterChange}
+                  disabled={loading}
+                >
+                  Apply Filters
+                </Button>
+              </Grid>
             </Grid>
-            
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                variant="contained" 
-                color="primary"
-                onClick={handleBookingFilterChange}
-                disabled={loading}
-              >
-                Apply Filters
-              </Button>
-            </Box>
           </Box>
           
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
               <CircularProgress />
             </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ my: 2 }}>
+              {error}
+            </Alert>
+          ) : bookings.length === 0 ? (
+            <Alert severity="info" sx={{ my: 2 }}>
+              No bookings found.
+            </Alert>
           ) : (
-            <TableContainer>
+            <TableContainer component={Paper} variant="outlined">
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Booking ID</TableCell>
-                    <TableCell>Student</TableCell>
-                    <TableCell>Room</TableCell>
+                    <TableCell>User</TableCell>
                     <TableCell>Hostel</TableCell>
                     <TableCell>Machine</TableCell>
                     <TableCell>Start Time</TableCell>
@@ -378,124 +661,54 @@ const StaffDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {bookings.length > 0 ? (
-                    bookings.map((booking) => (
-                      <TableRow key={booking._id}>
-                        <TableCell>{booking._id.substring(0, 8)}</TableCell>
-                        <TableCell>{booking.user.name}</TableCell>
-                        <TableCell>{booking.user.roomNumber}</TableCell>
-                        <TableCell>{booking.hostel.name}</TableCell>
-                        <TableCell>{booking.machine.name}</TableCell>
-                        <TableCell>{formatDate(booking.startTime)}</TableCell>
-                        <TableCell>{formatDate(booking.endTime)}</TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={booking.status.replace('_', ' ')} 
-                            color={getStatusColor(booking.status)} 
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {booking.paymentStatus ? (
-                            <Chip label="Paid" color="success" size="small" />
-                          ) : (
-                            <Chip label="Unpaid" color="error" size="small" />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={9} align="center">
-                        No bookings found
+                  {bookings.map((booking) => (
+                    <TableRow key={booking._id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <PersonIcon fontSize="small" sx={{ mr: 1 }} />
+                          {booking.user.name} (Room {booking.user.roomNumber})
+                        </Box>
+                      </TableCell>
+                      <TableCell>{booking.hostel.name}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <LocalLaundryServiceIcon fontSize="small" sx={{ mr: 1 }} />
+                          {booking.machine.name}
+                        </Box>
+                      </TableCell>
+                      <TableCell>{formatDate(booking.startTime)}</TableCell>
+                      <TableCell>{formatDate(booking.endTime)}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={booking.status.charAt(0).toUpperCase() + booking.status.slice(1)} 
+                          color={getStatusColor(booking.status)} 
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={booking.paymentStatus} 
+                          color={booking.paymentStatus === 'paid' ? 'success' : 'warning'} 
+                          size="small"
+                        />
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </TableContainer>
           )}
         </TabPanel>
         
-        {/* Bookings by Hostel Tab */}
-        <TabPanel value={tabValue} index={1}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Grid container spacing={3}>
-              {bookingsByHostel.map((item) => (
-                <Grid item xs={12} key={item.hostel._id}>
-                  <Card>
-                    <CardHeader 
-                      title={item.hostel.name} 
-                      subheader={item.hostel.location}
-                    />
-                    <Divider />
-                    <CardContent>
-                      {item.bookings.length > 0 ? (
-                        <TableContainer>
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Booking ID</TableCell>
-                                <TableCell>Student</TableCell>
-                                <TableCell>Room</TableCell>
-                                <TableCell>Machine</TableCell>
-                                <TableCell>Start Time</TableCell>
-                                <TableCell>End Time</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Payment</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {item.bookings.map((booking) => (
-                                <TableRow key={booking._id}>
-                                  <TableCell>{booking._id.substring(0, 8)}</TableCell>
-                                  <TableCell>{booking.user.name}</TableCell>
-                                  <TableCell>{booking.user.roomNumber}</TableCell>
-                                  <TableCell>{booking.machine.name}</TableCell>
-                                  <TableCell>{formatDate(booking.startTime)}</TableCell>
-                                  <TableCell>{formatDate(booking.endTime)}</TableCell>
-                                  <TableCell>
-                                    <Chip 
-                                      label={booking.status.replace('_', ' ')} 
-                                      color={getStatusColor(booking.status)} 
-                                      size="small"
-                                    />
-                                  </TableCell>
-                                  <TableCell>
-                                    {booking.paymentStatus ? (
-                                      <Chip label="Paid" color="success" size="small" />
-                                    ) : (
-                                      <Chip label="Unpaid" color="error" size="small" />
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary" align="center">
-                          No bookings found for this hostel
-                        </Typography>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </TabPanel>
-        
-        {/* Machine Status Tab */}
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={3}>
+          <Typography variant="h5" gutterBottom>
+            All Machines
+          </Typography>
+          
           <Box sx={{ mb: 3 }}>
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth>
+                <FormControl fullWidth size="small">
                   <InputLabel>Hostel</InputLabel>
                   <Select
                     value={selectedMachineHostel}
@@ -511,9 +724,8 @@ const StaffDashboard = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              
               <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth>
+                <FormControl fullWidth size="small">
                   <InputLabel>Status</InputLabel>
                   <Select
                     value={selectedMachineStatus}
@@ -522,15 +734,14 @@ const StaffDashboard = () => {
                   >
                     <MenuItem value="">All Statuses</MenuItem>
                     <MenuItem value="available">Available</MenuItem>
-                    <MenuItem value="in_use">In Use</MenuItem>
+                    <MenuItem value="in-use">In Use</MenuItem>
                     <MenuItem value="maintenance">Maintenance</MenuItem>
-                    <MenuItem value="out-of-order">Out of Order</MenuItem>
+                    <MenuItem value="offline">Offline</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              
               <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth>
+                <FormControl fullWidth size="small">
                   <InputLabel>Type</InputLabel>
                   <Select
                     value={selectedMachineType}
@@ -543,141 +754,62 @@ const StaffDashboard = () => {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12}>
+                <Button 
+                  variant="contained" 
+                  onClick={handleMachineFilterChange}
+                  disabled={loading}
+                >
+                  Apply Filters
+                </Button>
+              </Grid>
             </Grid>
-            
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                variant="contained" 
-                color="primary"
-                onClick={handleMachineFilterChange}
-                disabled={loading}
-              >
-                Apply Filters
-              </Button>
-            </Box>
           </Box>
           
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
               <CircularProgress />
             </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ my: 2 }}>
+              {error}
+            </Alert>
+          ) : machines.length === 0 ? (
+            <Alert severity="info" sx={{ my: 2 }}>
+              No machines found.
+            </Alert>
           ) : (
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Machine Name</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Hostel</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Cost</TableCell>
-                    <TableCell>Time</TableCell>
-                    <TableCell>Last Maintenance</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {machines.length > 0 ? (
-                    machines.map((machine) => (
-                      <TableRow key={machine._id}>
-                        <TableCell>{machine.name}</TableCell>
-                        <TableCell>{machine.type.charAt(0).toUpperCase() + machine.type.slice(1)}</TableCell>
-                        <TableCell>{machine.hostel.name}</TableCell>
-                        <TableCell>{getMachineStatusChip(machine.status)}</TableCell>
-                        <TableCell>₹{machine.costPerUse}</TableCell>
-                        <TableCell>{machine.timePerUse} min</TableCell>
-                        <TableCell>
-                          {machine.lastMaintenance 
-                            ? formatDate(machine.lastMaintenance) 
-                            : 'Never'}
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="outlined" 
-                            size="small"
+            <Grid container spacing={2}>
+              {machines.map((machine) => (
+                <Grid item xs={12} sm={6} md={4} key={machine._id}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="h6">
+                          {machine.name}
+                        </Typography>
+                        {getMachineStatusChip(machine.status)}
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Hostel: {machine.hostel.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Type: {machine.type}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Last Maintenance: {machine.lastMaintenance ? formatDate(machine.lastMaintenance) : 'Never'}
+                      </Typography>
+                      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                        <Tooltip title="Update Status">
+                          <IconButton 
+                            size="small" 
+                            color="primary" 
                             onClick={() => handleOpenDialog(machine)}
                           >
-                            Update Status
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={8} align="center">
-                        No machines found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </TabPanel>
-        
-        {/* Machines by Hostel Tab */}
-        <TabPanel value={tabValue} index={3}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Grid container spacing={3}>
-              {machinesByHostel.map((item) => (
-                <Grid item xs={12} key={item.hostel._id}>
-                  <Card>
-                    <CardHeader 
-                      title={item.hostel.name} 
-                      subheader={item.hostel.location}
-                    />
-                    <Divider />
-                    <CardContent>
-                      {item.machines.length > 0 ? (
-                        <TableContainer>
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Machine Name</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell>Cost</TableCell>
-                                <TableCell>Time</TableCell>
-                                <TableCell>Last Maintenance</TableCell>
-                                <TableCell>Actions</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {item.machines.map((machine) => (
-                                <TableRow key={machine._id}>
-                                  <TableCell>{machine.name}</TableCell>
-                                  <TableCell>{machine.type.charAt(0).toUpperCase() + machine.type.slice(1)}</TableCell>
-                                  <TableCell>{getMachineStatusChip(machine.status)}</TableCell>
-                                  <TableCell>₹{machine.costPerUse}</TableCell>
-                                  <TableCell>{machine.timePerUse} min</TableCell>
-                                  <TableCell>
-                                    {machine.lastMaintenance 
-                                      ? formatDate(machine.lastMaintenance) 
-                                      : 'Never'}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Button 
-                                      variant="outlined" 
-                                      size="small"
-                                      onClick={() => handleOpenDialog(machine)}
-                                    >
-                                      Update Status
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary" align="center">
-                          No machines found for this hostel
-                        </Typography>
-                      )}
+                            <BuildIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -691,41 +823,39 @@ const StaffDashboard = () => {
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>Update Machine Status</DialogTitle>
         <DialogContent>
-          {selectedMachine && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Machine: {selectedMachine.name} ({selectedMachine.type})
-              </Typography>
-              <Typography variant="subtitle2" gutterBottom>
-                Current Status: {selectedMachine.status.replace('_', ' ')}
-              </Typography>
-              
-              <FormControl fullWidth sx={{ mt: 2 }}>
-                <InputLabel>New Status</InputLabel>
-                <Select
-                  value={newStatus}
-                  label="New Status"
-                  onChange={(e) => setNewStatus(e.target.value)}
-                >
-                  <MenuItem value="available">Available</MenuItem>
-                  <MenuItem value="in_use">In Use</MenuItem>
-                  <MenuItem value="maintenance">Maintenance</MenuItem>
-                  <MenuItem value="out-of-order">Out of Order</MenuItem>
-                </Select>
-              </FormControl>
-              
-              {newStatus === 'maintenance' && (
-                <TextField
-                  fullWidth
-                  label="Maintenance Note"
-                  multiline
-                  rows={3}
-                  value={maintenanceNote}
-                  onChange={(e) => setMaintenanceNote(e.target.value)}
-                  sx={{ mt: 2 }}
-                />
-              )}
-            </Box>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1">
+              {selectedMachine?.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Current Status: {selectedMachine?.status}
+            </Typography>
+          </Box>
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>New Status</InputLabel>
+            <Select
+              value={newStatus}
+              label="New Status"
+              onChange={(e) => setNewStatus(e.target.value)}
+            >
+              <MenuItem value="available">Available</MenuItem>
+              <MenuItem value="in-use">In Use</MenuItem>
+              <MenuItem value="maintenance">Maintenance</MenuItem>
+              <MenuItem value="offline">Offline</MenuItem>
+            </Select>
+          </FormControl>
+          
+          {newStatus === 'maintenance' && (
+            <TextField
+              fullWidth
+              label="Maintenance Note"
+              multiline
+              rows={3}
+              value={maintenanceNote}
+              onChange={(e) => setMaintenanceNote(e.target.value)}
+              sx={{ mb: 2 }}
+            />
           )}
         </DialogContent>
         <DialogActions>
