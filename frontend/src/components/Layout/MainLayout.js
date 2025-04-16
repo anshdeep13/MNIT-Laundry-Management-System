@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -24,6 +24,10 @@ import {
   useMediaQuery,
   useTheme,
   alpha,
+  Container,
+  Collapse,
+  Paper,
+  Fade,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -43,7 +47,27 @@ import {
   CalendarToday as CalendarTodayIcon,
   Apartment as ApartmentIcon,
   Assessment as AssessmentIcon,
+  ChevronRight as ChevronRightIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Brightness4 as DarkModeIcon,
+  NightsStay as NightIcon,
+  LightMode as LightIcon,
 } from '@mui/icons-material';
+import { keyframes } from '@mui/system';
+
+// Define animations
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+`;
 
 const drawerWidth = 280;
 
@@ -53,8 +77,27 @@ const MainLayout = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [expandedSections, setExpandedSections] = useState({});
+  const [animate, setAnimate] = useState(false);
+
+  useEffect(() => {
+    // Close mobile drawer when route changes
+    setMobileOpen(false);
+    
+    // Animate menu items when component mounts or route changes
+    setAnimate(true);
+    
+    // Reset animation after a delay to ensure it plays on route changes
+    const timer = setTimeout(() => {
+      setAnimate(false);
+      setTimeout(() => setAnimate(true), 50);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -68,10 +111,25 @@ const MainLayout = () => {
     setAnchorEl(null);
   };
 
+  const handleNotificationMenuOpen = (event) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationMenuClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
   const handleLogout = async () => {
     handleProfileMenuClose();
     await logout();
     navigate('/login');
+  };
+
+  const toggleSectionExpand = (section) => {
+    setExpandedSections({
+      ...expandedSections,
+      [section]: !expandedSections[section]
+    });
   };
 
   // Menu items based on user role
@@ -103,7 +161,7 @@ const MainLayout = () => {
         text: 'Messages',
         icon: <MessageIcon />,
         path: '/messages',
-        roles: ['student', 'staff', 'admin'],
+        roles: ['student'],
       },
       {
         text: 'My Wallet',
@@ -121,43 +179,23 @@ const MainLayout = () => {
           icon: null,
           path: null,
           divider: true,
+          isSection: true,
+          section: 'staff',
           roles: ['staff', 'admin'],
-        },
-        {
-          text: 'Staff Dashboard',
-          icon: <AdminIcon />,
-          path: '/staff',
-          roles: ['staff', 'admin'],
-        },
-        {
-          text: 'Manage Bookings',
-          icon: <CalendarTodayIcon />,
-          path: '/staff/bookings',
-          roles: ['staff'],
-        },
-        {
-          text: 'Manage Machines',
-          icon: <LaundryIcon />,
-          path: '/staff/machines',
-          roles: ['staff'],
-        },
-        {
-          text: 'Manage Hostels',
-          icon: <ApartmentIcon />,
-          path: '/staff/hostels',
-          roles: ['staff'],
-        },
-        {
-          text: 'Manage Users',
-          icon: <UsersIcon />,
-          path: '/staff/users',
-          roles: ['staff'],
-        },
-        {
-          text: 'Reports',
-          icon: <AssessmentIcon />,
-          path: '/staff/reports',
-          roles: ['staff'],
+          children: [
+            {
+              text: 'Staff Dashboard',
+              icon: <AdminIcon />,
+              path: '/staff',
+              roles: ['staff', 'admin'],
+            },
+            {
+              text: 'Staff Messages',
+              icon: <MessageIcon />,
+              path: '/staff/messages',
+              roles: ['staff', 'admin'],
+            }
+          ]
         }
       );
     }
@@ -170,43 +208,35 @@ const MainLayout = () => {
           icon: null,
           path: null,
           divider: true,
+          isSection: true,
+          section: 'admin',
           roles: ['admin'],
-        },
-        {
-          text: 'Admin Dashboard',
-          icon: <AdminIcon />,
-          path: '/admin',
-          roles: ['admin'],
-        },
-        {
-          text: 'Manage Users',
-          icon: <UsersIcon />,
-          path: '/admin/staff',
-          roles: ['admin'],
-        },
-        {
-          text: 'Manage Hostels',
-          icon: <ApartmentIcon />,
-          path: '/admin/hostels',
-          roles: ['admin'],
-        },
-        {
-          text: 'Manage Machines',
-          icon: <LaundryIcon />,
-          path: '/admin/machines',
-          roles: ['admin'],
-        },
-        {
-          text: 'System Settings',
-          icon: <SettingsIcon />,
-          path: '/admin/settings',
-          roles: ['admin'],
-        },
-        {
-          text: 'Reports',
-          icon: <AssessmentIcon />,
-          path: '/admin/reports',
-          roles: ['admin'],
+          children: [
+            {
+              text: 'Admin Dashboard',
+              icon: <AdminIcon />,
+              path: '/admin',
+              roles: ['admin'],
+            },
+            {
+              text: 'Manage Staff',
+              icon: <UsersIcon />,
+              path: '/admin/staff',
+              roles: ['admin'],
+            },
+            {
+              text: 'Manage Hostels',
+              icon: <ApartmentIcon />,
+              path: '/admin/hostels',
+              roles: ['admin'],
+            },
+            {
+              text: 'Manage Machines',
+              icon: <LaundryIcon />,
+              path: '/admin/machines',
+              roles: ['admin'],
+            }
+          ]
         }
       );
     }
@@ -216,171 +246,399 @@ const MainLayout = () => {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box
-        sx={{
-          display: 'flex',
+      <Box 
+        sx={{ 
+          py: 2, 
+          px: 2, 
+          display: 'flex', 
           alignItems: 'center',
-          justifyContent: 'center',
-          p: 3,
-          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          color: 'white',
-          borderRadius: '0 0 16px 16px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          background: theme.palette.background.headerGradient,
+          mb: 1.5
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <LaundryIcon sx={{ fontSize: 32, mr: 1 }} />
-          <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
-            MNIT Laundry
-          </Typography>
-        </Box>
-      </Box>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Box 
+        <Avatar 
           sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            p: 1.5, 
-            borderRadius: 2,
-            bgcolor: alpha(theme.palette.primary.main, 0.08),
-            width: '100%',
+            bgcolor: 'rgba(255, 255, 255, 0.2)', 
+            color: 'white',
+            mr: 2,
+            width: 40,
+            height: 40
           }}
         >
+          <LaundryIcon />
+        </Avatar>
+        <Typography variant="h6" color="white" fontWeight={600}>
+          MNIT Laundry
+        </Typography>
+      </Box>
+      
+      {user && (
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          px: 2, 
+          py: 2,
+          mb: 1.5,
+          background: alpha(theme.palette.primary.main, 0.05),
+          backdropFilter: 'blur(10px)',
+          borderRadius: 2,
+          mx: 2
+        }}>
           <Avatar 
             sx={{ 
-              width: 40, 
-              height: 40, 
-              bgcolor: theme.palette.primary.main,
-              mr: 1.5,
+              bgcolor: theme.palette.primary.main, 
+              color: 'white',
+              width: 42, 
+              height: 42,
+              boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
+              border: '2px solid white'
             }}
           >
-            {user?.name?.charAt(0) || <AccountCircleIcon />}
+            {user?.name ? user.name.charAt(0).toUpperCase() : <PersonIcon />}
           </Avatar>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          <Box sx={{ ml: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
               {user?.name || 'User'}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary', textTransform: 'capitalize' }}>
-              {user?.role || 'Role'}
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
+              {user?.role === 'student'
+                ? `${user?.hostel?.name || 'Hostel'}, Room ${user?.roomNumber}`
+                : `${user?.role.charAt(0).toUpperCase() + user?.role.slice(1)}`}
             </Typography>
           </Box>
         </Box>
-      </Box>
-      <Divider sx={{ mx: 2 }} />
-      <List sx={{ flexGrow: 1, px: 2, py: 1 }}>
-        {getMenuItems().map((item, index) => {
-          // If it's a divider, render a divider
-          if (item.divider) {
+      )}
+      
+      <Divider sx={{ mb: 2, mx: 2 }} />
+      
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          flexGrow: 1, 
+          overflow: 'auto',
+          px: 2
+        }}
+      >
+        <List component="nav" disablePadding sx={{ width: '100%' }}>
+          {getMenuItems().map((item, index) => {
+            if (!item.roles || !item.roles.includes(user?.role)) {
+              return null;
+            }
+
+            if (item.divider) {
+              return (
+                <React.Fragment key={`section-${index}`}>
+                  {index > 0 && <Divider sx={{ my: 2 }} />}
+                  
+                  {item.isSection ? (
+                    <Box>
+                      <ListItemButton 
+                        onClick={() => toggleSectionExpand(item.section)}
+                        sx={{ 
+                          borderRadius: 2,
+                          py: 1.5,
+                          mb: 1,
+                          bgcolor: alpha(theme.palette.primary.main, 0.08)
+                        }}
+                      >
+                        <ListItemText 
+                          primary={
+                            <Typography variant="body2" fontWeight={600} color="text.secondary">
+                              {item.text}
+                            </Typography>
+                          } 
+                        />
+                        {expandedSections[item.section] ? 
+                          <ExpandLessIcon fontSize="small" color="action" /> : 
+                          <ExpandMoreIcon fontSize="small" color="action" />
+                        }
+                      </ListItemButton>
+                      
+                      <Collapse in={expandedSections[item.section] !== false} timeout="auto" unmountOnExit>
+                        <List component="div" disablePadding>
+                          {item.children?.map((child, childIndex) => {
+                            if (!child.roles || !child.roles.includes(user?.role)) {
+                              return null;
+                            }
+                            
+                            const isSelected = child.path && location.pathname === child.path;
+                            
+                            return (
+                              <Fade 
+                                key={`${item.section}-child-${childIndex}`} 
+                                in={animate} 
+                                timeout={300} 
+                                style={{ transitionDelay: `${50 * childIndex}ms` }}
+                              >
+                                <ListItemButton
+                                  component={Link}
+                                  to={child.path}
+                                  selected={isSelected}
+                                  sx={{ 
+                                    mb: 0.5, 
+                                    borderRadius: 2,
+                                    pl: 4,
+                                    py: 1,
+                                    transition: 'all 0.2s ease-in-out',
+                                    '&:hover': {
+                                      transform: 'translateX(5px)'
+                                    },
+                                    animation: animate ? `${fadeIn} 0.4s ease-out` : 'none',
+                                    animationDelay: `${50 * childIndex}ms`,
+                                  }}
+                                >
+                                  <ListItemIcon sx={{ minWidth: 36 }}>
+                                    {child.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" fontWeight={isSelected ? 600 : 400}>
+                                        {child.text}
+                                      </Typography>
+                                    }
+                                  />
+                                  {isSelected && (
+                                    <Box 
+                                      sx={{ 
+                                        width: 4,
+                                        height: 20,
+                                        borderRadius: 4,
+                                        bgcolor: theme.palette.primary.main,
+                                        ml: 1
+                                      }} 
+                                    />
+                                  )}
+                                </ListItemButton>
+                              </Fade>
+                            );
+                          })}
+                        </List>
+                      </Collapse>
+                    </Box>
+                  ) : (
+                    <Typography
+                      variant="overline"
+                      sx={{
+                        color: 'text.secondary',
+                        px: 2,
+                        display: 'block',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {item.text}
+                    </Typography>
+                  )}
+                </React.Fragment>
+              );
+            }
+
+            const isSelected = item.path && location.pathname === item.path;
+
             return (
-              <React.Fragment key={index}>
-                <Divider sx={{ my: 1.5 }} />
-                <Typography
-                  variant="caption"
-                  sx={{ 
-                    px: 2, 
-                    py: 1, 
-                    color: 'text.secondary', 
-                    fontWeight: 600,
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {item.text}
-                </Typography>
-              </React.Fragment>
-            );
-          }
-
-          // Skip if user role doesn't have access
-          if (!item.roles.includes(user?.role)) {
-            return null;
-          }
-
-          const isActive = location.pathname === item.path;
-          
-          return (
-            <ListItem key={index} disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                component={Link}
-                to={item.path}
-                selected={isActive}
-                sx={{
-                  borderRadius: 2,
-                  mb: 0.5,
-                  '&.Mui-selected': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.08),
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: theme.palette.primary.main,
-                    },
-                    '& .MuiListItemText-primary': {
-                      color: theme.palette.primary.main,
-                      fontWeight: 600,
-                    },
-                  },
-                }}
+              <Fade 
+                key={index} 
+                in={animate} 
+                timeout={300} 
+                style={{ transitionDelay: `${50 * index}ms` }}
               >
-                <ListItemIcon 
+                <ListItemButton
+                  component={Link}
+                  to={item.path}
+                  selected={isSelected}
                   sx={{ 
-                    minWidth: 40,
-                    color: isActive ? theme.palette.primary.main : 'text.secondary',
+                    mb: 1, 
+                    borderRadius: 2,
+                    py: 1.2,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      transform: 'translateX(5px)'
+                    },
+                    animation: animate ? `${fadeIn} 0.4s ease-out` : 'none',
+                    animationDelay: `${50 * index}ms`,
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.text} 
-                  sx={{ 
-                    '& .MuiListItemText-primary': {
-                      fontWeight: isActive ? 600 : 400,
-                    },
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
-      </List>
-      <Divider sx={{ mx: 2 }} />
-      <Box sx={{ p: 2 }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          color="error"
-          startIcon={<LogoutIcon />}
-          onClick={handleLogout}
-          sx={{ 
-            borderRadius: 2,
-            py: 1,
-            borderColor: alpha(theme.palette.error.main, 0.5),
-            color: theme.palette.error.main,
-            '&:hover': {
-              borderColor: theme.palette.error.main,
-              bgcolor: alpha(theme.palette.error.main, 0.05),
-            },
-          }}
-        >
-          Logout
-        </Button>
+                  <ListItemIcon>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={
+                      <Typography variant="body1" fontWeight={isSelected ? 600 : 400}>
+                        {item.text}
+                      </Typography>
+                    } 
+                  />
+                  {isSelected && (
+                    <Box 
+                      sx={{ 
+                        width: 4,
+                        height: 20,
+                        borderRadius: 4,
+                        bgcolor: theme.palette.primary.main,
+                        ml: 1
+                      }} 
+                    />
+                  )}
+                </ListItemButton>
+              </Fade>
+            );
+          })}
+        </List>
+      </Box>
+      
+      <Box 
+        sx={{ 
+          p: 2, 
+          mt: 'auto',
+          borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`
+        }}
+      >
+        <Box sx={{ 
+          p: 2, 
+          borderRadius: 2, 
+          bgcolor: alpha(theme.palette.primary.main, 0.05),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mb: 1
+        }}>
+          <Button
+            variant="contained"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            fullWidth
+            sx={{ 
+              py: 1.2,
+              fontWeight: 600
+            }}
+          >
+            Sign Out
+          </Button>
+        </Box>
+        
+        <Typography variant="caption" color="text.secondary" align="center" sx={{ display: 'block', mt: 1 }}>
+          MNIT Laundry Management &copy; {new Date().getFullYear()}
+        </Typography>
       </Box>
     </Box>
+  );
+
+  const profileMenu = (
+    <Menu
+      anchorEl={anchorEl}
+      open={Boolean(anchorEl)}
+      onClose={handleProfileMenuClose}
+      transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+      anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      PaperProps={{
+        elevation: 3,
+        sx: {
+          width: 200,
+          borderRadius: 2,
+          overflow: 'hidden',
+          mt: 1.5,
+          backdropFilter: 'blur(10px)',
+          '& .MuiMenuItem-root': {
+            px: 2,
+            py: 1.5,
+            gap: 1.5,
+            borderRadius: 1,
+            mx: 0.5
+          },
+        },
+      }}
+    >
+      <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/profile'); }}>
+        <PersonIcon fontSize="small" />
+        <Typography variant="body2">Profile</Typography>
+      </MenuItem>
+      <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/wallet'); }}>
+        <WalletIcon fontSize="small" />
+        <Typography variant="body2">My Wallet</Typography>
+      </MenuItem>
+      <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/settings'); }}>
+        <SettingsIcon fontSize="small" />
+        <Typography variant="body2">Settings</Typography>
+      </MenuItem>
+      <Divider sx={{ my: 1 }} />
+      <MenuItem onClick={handleLogout} sx={{ color: theme.palette.error.main }}>
+        <LogoutIcon fontSize="small" />
+        <Typography variant="body2">Sign Out</Typography>
+      </MenuItem>
+    </Menu>
+  );
+
+  const notificationsMenu = (
+    <Menu
+      anchorEl={notificationAnchorEl}
+      open={Boolean(notificationAnchorEl)}
+      onClose={handleNotificationMenuClose}
+      transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+      anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      PaperProps={{
+        elevation: 3,
+        sx: {
+          width: 320,
+          borderRadius: 2,
+          overflow: 'hidden',
+          mt: 1.5,
+          backdropFilter: 'blur(10px)',
+        },
+      }}
+    >
+      <Box sx={{ p: 2, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}>
+        <Typography variant="subtitle1" fontWeight={600}>Notifications</Typography>
+      </Box>
+      
+      <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+        <MenuItem sx={{ px: 2, py: 1.5 }}>
+          <Box>
+            <Typography variant="body2" fontWeight={500}>Your booking has been confirmed</Typography>
+            <Typography variant="caption" color="text.secondary">5 minutes ago</Typography>
+          </Box>
+        </MenuItem>
+        <MenuItem sx={{ px: 2, py: 1.5 }}>
+          <Box>
+            <Typography variant="body2" fontWeight={500}>Payment received successfully</Typography>
+            <Typography variant="caption" color="text.secondary">2 hours ago</Typography>
+          </Box>
+        </MenuItem>
+        <MenuItem sx={{ px: 2, py: 1.5 }}>
+          <Box>
+            <Typography variant="body2" fontWeight={500}>Your laundry is ready for pickup</Typography>
+            <Typography variant="caption" color="text.secondary">Yesterday</Typography>
+          </Box>
+        </MenuItem>
+      </Box>
+      
+      <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, textAlign: 'center' }}>
+        <Button 
+          size="small" 
+          variant="text" 
+          sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+          onClick={() => {
+            handleNotificationMenuClose();
+            navigate('/notifications');
+          }}
+        >
+          View All Notifications
+        </Button>
+      </Box>
+    </Menu>
   );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-          bgcolor: 'background.paper',
-          color: 'text.primary',
-          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
+      <AppBar 
+        position="fixed" 
+        sx={{ 
+          width: { md: `calc(100% - ${drawerWidth}px)` }, 
+          ml: { md: `${drawerWidth}px` },
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         }}
-        elevation={0}
       >
         <Toolbar>
           <IconButton
@@ -388,46 +646,75 @@ const MainLayout = () => {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 2, display: { md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {getMenuItems().find(item => item.path === location.pathname)?.text || 'Dashboard'}
+          
+          <Typography 
+            variant="h6" 
+            component="div" 
+            sx={{ 
+              flexGrow: 1, 
+              fontWeight: 600,
+              display: { xs: 'none', sm: 'block' } 
+            }}
+          >
+            {user?.role === 'student' ? 'Student Dashboard' : 
+             user?.role === 'staff' ? 'Staff Dashboard' : 
+             user?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          
+          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center' }}>
             <Tooltip title="Notifications">
-              <IconButton color="inherit" sx={{ mr: 1 }}>
+              <IconButton 
+                size="large" 
+                onClick={handleNotificationMenuOpen}
+                color="inherit"
+                sx={{ mr: { xs: 1, sm: 2 } }}
+              >
                 <Badge badgeContent={3} color="error">
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
             </Tooltip>
-            <Tooltip title="Account settings">
+            
+            <Tooltip title="Account">
               <IconButton
-                edge="end"
-                aria-label="account of current user"
-                aria-haspopup="true"
+                size="large"
                 onClick={handleProfileMenuOpen}
                 color="inherit"
+                sx={{ 
+                  border: '2px solid rgba(255,255,255,0.2)',
+                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+                }}
               >
                 <Avatar 
+                  alt={user?.name || 'User'} 
+                  src="/static/images/avatar/2.jpg"
                   sx={{ 
-                    width: 32, 
-                    height: 32, 
-                    bgcolor: theme.palette.primary.main,
+                    width: 30, 
+                    height: 30,
+                    bgcolor: 'primary.dark',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    fontWeight: 'bold',
                   }}
                 >
-                  {user?.name?.charAt(0) || <AccountCircleIcon />}
+                  {user?.name ? user.name.charAt(0).toUpperCase() : <PersonIcon />}
                 </Avatar>
               </IconButton>
             </Tooltip>
           </Box>
         </Toolbar>
       </AppBar>
+      
+      {profileMenu}
+      {notificationsMenu}
+      
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
         aria-label="mailbox folders"
       >
         <Drawer
@@ -438,8 +725,11 @@ const MainLayout = () => {
             keepMounted: true, // Better open performance on mobile.
           }}
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+            },
           }}
         >
           {drawer}
@@ -447,68 +737,34 @@ const MainLayout = () => {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              border: 'none',
+            },
           }}
           open
         >
           {drawer}
         </Drawer>
       </Box>
+      
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          bgcolor: 'background.default',
+          width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         <Toolbar />
-        <Box sx={{ 
-          p: { xs: 1, sm: 2, md: 3 },
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
-        }}>
+        <Box component="div" sx={{ flexGrow: 1, py: 2 }}>
           <Outlet />
         </Box>
       </Box>
-      <Menu
-        anchorEl={anchorEl}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right',
-        }}
-        keepMounted
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'right',
-        }}
-        open={Boolean(anchorEl)}
-        onClose={handleProfileMenuClose}
-      >
-        <MenuItem onClick={handleProfileMenuClose}>
-          <ListItemIcon>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          Profile
-        </MenuItem>
-        <MenuItem onClick={handleProfileMenuClose}>
-          <ListItemIcon>
-            <SettingsIcon fontSize="small" />
-          </ListItemIcon>
-          Settings
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleLogout}>
-          <ListItemIcon>
-            <LogoutIcon fontSize="small" />
-          </ListItemIcon>
-          Logout
-        </MenuItem>
-      </Menu>
     </Box>
   );
 };

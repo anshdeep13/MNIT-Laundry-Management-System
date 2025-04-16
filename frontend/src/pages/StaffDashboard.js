@@ -40,6 +40,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { format } from 'date-fns';
 import { staffAPI } from '../services/api';
+import { useTheme } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BuildIcon from '@mui/icons-material/Build';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -48,6 +49,8 @@ import PendingIcon from '@mui/icons-material/Pending';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
 import LocalLaundryServiceIcon from '@mui/icons-material/LocalLaundryService';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import StaffPageHeader from '../components/StaffPageHeader';
 
 // TabPanel component for tab content
 function TabPanel(props) {
@@ -79,6 +82,7 @@ const StaffDashboard = () => {
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const theme = useTheme();
   
   // Filter states for bookings
   const [selectedHostel, setSelectedHostel] = useState('');
@@ -528,13 +532,29 @@ const StaffDashboard = () => {
     );
   };
   
+  if (loading && !selectedMachine) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Staff Dashboard
-        </Typography>
+    <Container maxWidth="lg">
+      <StaffPageHeader
+        title="Staff Dashboard"
+        description="Manage bookings, machines, and monitor campus laundry operations from one central location."
+        icon={<DashboardIcon />}
+      />
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          {error}
+        </Alert>
+      )}
         
+      <Paper sx={{ p: 3, borderRadius: 2 }}>
         <Tabs 
           value={tabValue} 
           onChange={handleTabChange} 

@@ -18,8 +18,7 @@ import ManageStaff from './pages/admin/ManageStaff';
 import LandingPage from './pages/LandingPage';
 import Wallet from './pages/Wallet';
 import Messages from './pages/Messages';
-import SystemSettings from './pages/admin/SystemSettings';
-import Reports from './pages/admin/Reports';
+import StaffMessages from './pages/StaffMessages';
 
 // Create a custom theme
 const theme = createTheme({
@@ -39,6 +38,7 @@ const theme = createTheme({
     background: {
       default: '#f8fafc',
       paper: '#ffffff',
+      headerGradient: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
     },
     error: {
       main: '#ef4444',
@@ -296,15 +296,23 @@ function App() {
             <Route 
               path="/messages" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['student']}>
                   <Messages />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/staff/messages" 
+              element={
+                <ProtectedRoute roles={['staff', 'admin']}>
+                  <StaffMessages />
                 </ProtectedRoute>
               } 
             />
             <Route 
               path="/book-machine" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['student']}>
                   <BookMachine />
                 </ProtectedRoute>
               } 
@@ -317,6 +325,8 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            
+            {/* Admin routes */}
             <Route 
               path="/admin" 
               element={
@@ -358,25 +368,9 @@ function App() {
               } 
             />
             <Route 
-              path="/admin/settings" 
-              element={
-                <ProtectedRoute roles={['admin']}>
-                  <SystemSettings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin/reports" 
-              element={
-                <ProtectedRoute roles={['admin']}>
-                  <Reports />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/wallet" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute roles={['student']}>
                   <Wallet />
                 </ProtectedRoute>
               } 

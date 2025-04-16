@@ -5,6 +5,7 @@ const API = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'https://mnit-laundry-management-system-backend.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
   withCredentials: true // Enable sending cookies with requests
 });
@@ -96,6 +97,15 @@ export const staffAPI = {
   
   // Get all hostels
   getHostels: () => API.get('/staff/hostels'),
+  
+  // Add new hostel
+  addHostel: (data) => API.post('/staff/hostels', data),
+  
+  // Update existing hostel
+  updateHostel: (hostelId, data) => API.put(`/staff/hostels/${hostelId}`, data),
+  
+  // Delete hostel
+  deleteHostel: (hostelId) => API.delete(`/staff/hostels/${hostelId}`),
   
   // Get staff profile
   getProfile: () => API.get('/staff/profile'),

@@ -620,44 +620,19 @@ const Register = () => {
         </Alert>
       )}
       
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          p: 3, 
-          mb: 4, 
-          borderRadius: 2,
-          bgcolor: alpha(theme.palette.background.paper, 0.8),
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+      <Box
+        sx={{
+          background: (theme) => theme.palette.background.headerGradient || 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+          p: 3,
+          color: 'white',
+          borderRadius: '15px 15px 0 0',
+          mb: 4,
         }}
       >
-        <Stepper 
-          activeStep={activeStep} 
-          alternativeLabel
-          sx={{
-            '& .MuiStepLabel-root .Mui-active': {
-              color: theme.palette.primary.main,
-            },
-            '& .MuiStepLabel-root .Mui-completed': {
-              color: theme.palette.success.main,
-            },
-          }}
-        >
-          {steps.map((label, index) => (
-            <Step key={label}>
-              <StepLabel 
-                StepIconProps={{
-                  sx: {
-                    color: activeStep > index ? theme.palette.success.main : undefined,
-                  }
-                }}
-              >
-                {label}
-              </StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Paper>
+        <Typography variant="h4" fontWeight="bold" align="center">
+          Register
+        </Typography>
+      </Box>
       
       <Paper 
         elevation={0} 

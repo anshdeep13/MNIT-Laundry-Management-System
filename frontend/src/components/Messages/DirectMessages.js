@@ -24,6 +24,7 @@ import {
   AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import API from '../../services/api';
+import { getDirectMessages, sendDirectMessage, markMessagesAsRead } from '../../services/message';
 
 const DirectMessages = () => {
   const { user } = useAuth();
@@ -66,9 +67,12 @@ const DirectMessages = () => {
         // Fetch messages if a user is selected
         if (selectedUser) {
           console.log('Fetching messages for selected user:', selectedUser._id);
-          const messagesResponse = await API.get(`/messages/direct/${selectedUser._id}`);
-          console.log('Messages response:', messagesResponse.data);
-          setMessages(messagesResponse.data);
+          const messagesData = await getDirectMessages(selectedUser._id);
+          console.log('Messages response:', messagesData);
+          setMessages(messagesData);
+          
+          // Mark messages as read
+          await markMessagesAsRead(selectedUser._id);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -87,13 +91,8 @@ const DirectMessages = () => {
     if (!newMessage.trim() || !selectedUser) return;
 
     try {
-      const response = await API.post('/messages/direct', {
-        recipientId: selectedUser._id,
-        content: newMessage.trim(),
-        subject: 'Direct Message'
-      });
-
-      setMessages([...messages, response.data]);
+      const response = await sendDirectMessage(selectedUser._id, newMessage.trim());
+      setMessages([...messages, response]);
       setNewMessage('');
     } catch (err) {
       console.error('Error sending message:', err);
@@ -171,7 +170,7 @@ const DirectMessages = () => {
       </Paper>
 
       {/* Chat Area */}
-      <Paper 
+      <Paper
         elevation={0}
         sx={{ 
           flex: 1,
@@ -197,7 +196,7 @@ const DirectMessages = () => {
             </Box>
 
             {/* Messages */}
-            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
               {loading ? (
                 <Box display="flex" justifyContent="center" alignItems="center" height="100%">
                   <CircularProgress />
@@ -212,7 +211,7 @@ const DirectMessages = () => {
                     key={message._id}
                     sx={{
                       display: 'flex',
-                      justifyContent: message.sender === user._id ? 'flex-end' : 'flex-start',
+                      justifyContent: message.sender._id === user._id ? 'flex-end' : 'flex-start',
                       mb: 2,
                     }}
                   >
@@ -221,7 +220,7 @@ const DirectMessages = () => {
                       sx={{
                         p: 2,
                         maxWidth: '70%',
-                        bgcolor: message.sender === user._id 
+                        bgcolor: message.sender._id === user._id 
                           ? alpha(theme.palette.primary.main, 0.1)
                           : alpha(theme.palette.background.paper, 0.8),
                         borderRadius: 2,
@@ -247,7 +246,7 @@ const DirectMessages = () => {
             </Box>
 
             {/* Message Input */}
-            <Box 
+            <Box
               component="form" 
               onSubmit={handleSendMessage}
               sx={{ 

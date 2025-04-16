@@ -11,6 +11,14 @@ const {
   updateProfile,
   changePassword
 } = require('../controllers/staffController');
+const {
+  getStaffMessages,
+  getStaffDirectMessages,
+  sendStaffDirectMessage,
+  markStaffMessagesAsRead,
+  getStaffUnreadCount,
+  getStudentsForStaff
+} = require('../controllers/staffMessageController');
 const { auth, authorize } = require('../middleware/auth');
 
 // Apply authentication and authorization middleware to all routes
@@ -33,5 +41,13 @@ router.get('/bookings/by-hostel', getBookingsByHostel);
 
 // Hostel management
 router.get('/hostels', getHostels);
+
+// Messaging functionality
+router.get('/messages', getStaffMessages);
+router.get('/messages/direct/:userId', getStaffDirectMessages);
+router.post('/messages/direct', sendStaffDirectMessage);
+router.put('/messages/read/:senderId', markStaffMessagesAsRead);
+router.get('/messages/unread/count', getStaffUnreadCount);
+router.get('/students', getStudentsForStaff);
 
 module.exports = router; 
