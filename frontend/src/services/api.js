@@ -95,6 +95,9 @@ export const staffAPI = {
   // Update machine status
   updateMachineStatus: (machineId, data) => API.patch(`/staff/machines/${machineId}/status`, data),
   
+  // Complete booking - fix the endpoint to match backend route
+  completeBooking: (bookingId) => API.put('/bookings/complete', { bookingId }),
+  
   // Get all hostels
   getHostels: () => API.get('/staff/hostels'),
   
@@ -138,4 +141,4 @@ export const authAPI = {
   logout: () => API.post('/auth/logout'),
 };
 
-export default API;
+export default API; 

@@ -19,6 +19,7 @@ const {
   getStaffUnreadCount,
   getStudentsForStaff
 } = require('../controllers/staffMessageController');
+const { completeBooking } = require('../controllers/booking');
 const { auth, authorize } = require('../middleware/auth');
 
 // Apply authentication and authorization middleware to all routes
@@ -38,6 +39,7 @@ router.patch('/machines/:machineId/status', updateMachineStatus);
 // Booking management
 router.get('/bookings', getBookings);
 router.get('/bookings/by-hostel', getBookingsByHostel);
+router.put('/bookings/complete', completeBooking);
 
 // Hostel management
 router.get('/hostels', getHostels);

@@ -51,6 +51,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LocalLaundryServiceIcon from '@mui/icons-material/LocalLaundryService';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import StaffPageHeader from '../components/StaffPageHeader';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 // TabPanel component for tab content
 function TabPanel(props) {
@@ -100,6 +101,8 @@ const StaffDashboard = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [maintenanceNote, setMaintenanceNote] = useState('');
   const [newStatus, setNewStatus] = useState('');
+  
+  const [successMessage, setSuccessMessage] = useState(null);
   
   // Fetch data on component mount
   useEffect(() => {
@@ -362,6 +365,85 @@ const StaffDashboard = () => {
     );
   };
   
+  // Add a function to get booking details before attempting to complete it
+  const getAndLogBookingDetails = async (bookingId) => {
+    try {
+      // Find the booking in the current data
+      const bookingInAll = bookings.find(b => b._id === bookingId);
+      const hostelsWithBooking = bookingsByHostel.filter(h => 
+        h.bookings.some(b => b._id === bookingId)
+      );
+      
+      const bookingInByHostel = hostelsWithBooking.length > 0 
+        ? hostelsWithBooking[0].bookings.find(b => b._id === bookingId)
+        : null;
+      
+      const booking = bookingInAll || bookingInByHostel;
+      
+      if (booking) {
+        console.log('Attempting to complete booking with details:', {
+          id: booking._id,
+          status: booking.status,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          user: booking.user?.name,
+          machine: booking.machine?.name
+        });
+      } else {
+        console.log('Booking not found in local state, ID:', bookingId);
+      }
+      
+      return booking?.status;
+    } catch (err) {
+      console.error('Error getting booking details:', err);
+      return null;
+    }
+  };
+  
+  // Handle booking completion
+  const handleCompleteBooking = async (bookingId) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccessMessage(null);
+      
+      // Get booking details for debugging
+      const status = await getAndLogBookingDetails(bookingId);
+      console.log('Booking status before completion attempt:', status);
+      
+      console.log('Sending complete booking request with ID:', bookingId);
+      
+      // Call the API to complete the booking
+      const response = await staffAPI.completeBooking(bookingId);
+      console.log('Booking completed successfully:', response.data);
+      
+      // Show success message
+      setSuccessMessage('Booking completed successfully!');
+      
+      // Fetch updated booking data
+      const bookingsResponse = await staffAPI.getBookings();
+      setBookings(bookingsResponse.data);
+      
+      const bookingsByHostelResponse = await staffAPI.getBookingsByHostel();
+      setBookingsByHostel(bookingsByHostelResponse.data);
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error completing booking:', err);
+      
+      // Display the specific error message from the API if available
+      const errorMsg = err.data?.msg || err.message || 'Unknown error';
+      setError(`Failed to complete booking: ${errorMsg}`);
+      
+      // Log more details to help debugging
+      if (err.data) {
+        console.log('Error details:', err.data);
+      }
+      
+      setLoading(false);
+    }
+  };
+  
   // Render bookings by hostel
   const renderBookingsByHostel = () => {
     if (loading) {
@@ -408,6 +490,7 @@ const StaffDashboard = () => {
                       <TableCell>End Time</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Payment</TableCell>
+                      <TableCell width="140px">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -440,6 +523,19 @@ const StaffDashboard = () => {
                             color={booking.paymentStatus === 'paid' ? 'success' : 'warning'} 
                             size="small"
                           />
+                        </TableCell>
+                        <TableCell>
+                          {(booking.status === 'in-progress' || booking.status === 'confirmed') && (
+                            <Button
+                              variant="contained"
+                              color="success"
+                              size="small"
+                              startIcon={<CheckCircleOutlineIcon />}
+                              onClick={() => handleCompleteBooking(booking._id)}
+                            >
+                              Complete
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -551,6 +647,12 @@ const StaffDashboard = () => {
       {error && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
           {error}
+        </Alert>
+      )}
+      
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+          {successMessage}
         </Alert>
       )}
         
@@ -678,6 +780,7 @@ const StaffDashboard = () => {
                     <TableCell>End Time</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Payment</TableCell>
+                    <TableCell width="140px">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -711,6 +814,19 @@ const StaffDashboard = () => {
                           color={booking.paymentStatus === 'paid' ? 'success' : 'warning'} 
                           size="small"
                         />
+                      </TableCell>
+                      <TableCell>
+                        {(booking.status === 'in-progress' || booking.status === 'confirmed') && (
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            startIcon={<CheckCircleOutlineIcon />}
+                            onClick={() => handleCompleteBooking(booking._id)}
+                          >
+                            Complete
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
