@@ -203,16 +203,45 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const updateWallet = async (amount) => {
+  const updateWallet = async (data) => {
     try {
-      const res = await axios.post('/auth/wallet', { amount });
+      console.log('Updating wallet with data:', data);
+      
+      // If data is just a number, convert to object with amount property
+      const payloadData = typeof data === 'number' ? { amount: data } : data;
+      
+      const res = await axios.post('/auth/wallet', payloadData);
+      
+      console.log('Wallet update response:', res.data);
       
       // Update user wallet balance
       setUser({ ...user, walletBalance: res.data.walletBalance });
       
       return res.data.walletBalance;
     } catch (err) {
+      console.error('Wallet update error:', err);
       setError(err.response?.data?.msg || 'Failed to update wallet');
+      throw err;
+    }
+  };
+
+  // Add function to refresh user data
+  const refreshUser = async () => {
+    try {
+      console.log('AuthContext: Refreshing user data...');
+      const res = await API.get('/auth/me');
+      console.log('AuthContext: User data refreshed:', res.data);
+      
+      // Update user state with fresh data
+      setUser(res.data);
+      
+      // Update saved user in localStorage
+      localStorage.setItem('user', JSON.stringify(res.data));
+      
+      return res.data;
+    } catch (err) {
+      console.error('AuthContext: Failed to refresh user:', err);
+      setError(err.response?.data?.msg || 'Failed to refresh user data');
       throw err;
     }
   };
@@ -226,7 +255,8 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
-        updateWallet
+        updateWallet,
+        refreshUser
       }}
     >
       {children}

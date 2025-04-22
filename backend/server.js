@@ -68,6 +68,10 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api', userRoutes);
 
+// Add wallet routes
+const walletRoutes = require('./routes/walletRoutes');
+app.use('/api/wallet', walletRoutes);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err.stack);

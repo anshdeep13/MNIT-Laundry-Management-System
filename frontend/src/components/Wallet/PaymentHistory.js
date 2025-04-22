@@ -37,7 +37,7 @@ import {
     Search as SearchIcon,
     Receipt as ReceiptIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+import API, { walletAPI } from '../../services/api';
 
 const PaymentHistory = () => {
     const [payments, setPayments] = useState([]);
@@ -60,7 +60,7 @@ const PaymentHistory = () => {
     const fetchPaymentHistory = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/wallet/history');
+            const response = await walletAPI.getHistory();
             setPayments(response.data);
             setTotalPayments(response.data.length);
             setError('');
@@ -97,10 +97,7 @@ const PaymentHistory = () => {
             setRefundError('');
             setRefundSuccess('');
 
-            await axios.post('/api/wallet/refund', {
-                paymentId: refundDialog.payment._id,
-                reason: refundReason
-            });
+            await walletAPI.requestRefund(refundDialog.payment._id, refundReason);
 
             setRefundSuccess('Refund request submitted successfully');
             setTimeout(() => {

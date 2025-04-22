@@ -386,62 +386,24 @@ exports.validateAccessCode = async (req, res) => {
 // Complete booking (machine usage ended)
 exports.completeBooking = async (req, res) => {
   try {
-    console.log('Request received to complete booking:', req.body);
-    
     const { bookingId } = req.body;
     
     if (!bookingId) {
-      console.log('No bookingId provided in request body');
       return res.status(400).json({ msg: 'Booking ID is required' });
     }
     
-    console.log('Completing booking with ID:', bookingId);
+    console.log('Completing booking:', bookingId);
     
-    let booking;
-    try {
-      booking = await Booking.findById(bookingId);
-    } catch (err) {
-      console.log('Error finding booking:', err.message);
-      return res.status(400).json({ msg: 'Invalid booking ID format' });
-    }
+    const booking = await Booking.findById(bookingId);
     
     if (!booking) {
-      console.log('Booking not found with ID:', bookingId);
       return res.status(404).json({ msg: 'Booking not found' });
     }
     
-    console.log('Found booking:', {
-      id: booking._id,
-      status: booking.status,
-      user: booking.user,
-      machine: booking.machine
-    });
-    
-    // Get full booking details to help with debugging
-    try {
-      const fullBooking = await Booking.findById(bookingId)
-        .populate('user', 'name')
-        .populate('machine', 'name status')
-        .populate('hostel', 'name');
-      
-      if (fullBooking) {
-        console.log('Full booking details:', {
-          id: fullBooking._id,
-          status: fullBooking.status,
-          user: fullBooking.user.name,
-          machine: fullBooking.machine.name,
-          machineStatus: fullBooking.machine.status,
-          hostel: fullBooking.hostel.name
-        });
-      }
-    } catch (err) {
-      console.log('Error getting full booking details (non-critical):', err.message);
-    }
+    console.log('Found booking with status:', booking.status);
     
     // Allow both confirmed and in_progress statuses
-    if (booking.status !== 'in_progress' && booking.status !== 'confirmed' && 
-        booking.status !== 'in-progress') {
-      console.log('Cannot complete booking because status is:', booking.status);
+    if (booking.status !== 'in_progress' && booking.status !== 'confirmed') {
       return res.status(400).json({ 
         msg: `This booking cannot be completed. It must be in progress or confirmed. Current status: ${booking.status}`
       });
@@ -464,17 +426,18 @@ exports.completeBooking = async (req, res) => {
     }
     
     await booking.save();
-    console.log('Booking status updated to completed');
     
     // Update machine status
     await Machine.findByIdAndUpdate(booking.machine, { status: 'available' });
-    console.log('Machine status updated to available');
     
     console.log('Booking completed successfully');
     
     res.json({ msg: 'Booking completed successfully', booking });
   } catch (err) {
     console.error('Error completing booking:', err);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'Invalid booking ID format' });
+    }
     res.status(500).json({ 
       msg: 'Server error while completing booking', 
       error: err.message 

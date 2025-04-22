@@ -21,7 +21,31 @@ export const getAllMessages = async () => {
 export const getDirectMessages = async (userId) => {
   try {
     console.log('Fetching direct messages with user:', userId);
-    const response = await api.get(`/messages/direct/${userId}`);
+    
+    // Get user role from localStorage
+    const userString = localStorage.getItem('user');
+    let userObj = null;
+    
+    try {
+      userObj = userString ? JSON.parse(userString) : null;
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+    }
+    
+    // Choose the appropriate endpoint based on user role
+    let endpoint = `/messages/direct/${userId}`;
+    
+    if (userObj && userObj.role === 'staff') {
+      endpoint = `/staff/messages/direct/${userId}`;
+      console.log('Using staff messages endpoint');
+    } else if (userObj && userObj.role === 'admin') {
+      endpoint = `/admin/messages/direct/${userId}`;
+      console.log('Using admin messages endpoint');
+    } else {
+      console.log('Using standard messages endpoint');
+    }
+    
+    const response = await api.get(endpoint);
     console.log('Direct messages fetched successfully:', response.data);
     return response.data;
   } catch (error) {
@@ -34,141 +58,239 @@ export const getDirectMessages = async (userId) => {
   }
 };
 
-// Send a direct message
-export const sendDirectMessage = async (recipientId, content, subject = '') => {
-  try {
-    console.log('Sending message to:', recipientId);
-    
-    // Ensure recipientId is a string
-    const recipientIdStr = String(recipientId);
-    
-    // Create the request data
-    const requestData = {
-      recipientId: recipientIdStr,
-      content,
-      subject
-    };
-    
-    console.log('Request data being sent:', requestData);
-    
-    // Get token for logging
+// Send a direct message using XMLHttpRequest for better reliability
+export const sendDirectMessage = (receiverId, content) => {
+  return new Promise((resolve, reject) => {
     const token = localStorage.getItem('token');
-    console.log('Using auth token:', token ? 'Present' : 'Missing');
+    const userString = localStorage.getItem('user');
+    const API_URL = api.defaults.baseURL; // Make sure API_URL is defined
     
-    // Make API call
-    const response = await api.post('/messages/direct', requestData);
-    console.log('Message sent successfully:', response.data);
-    return response.data;
-  } catch (error) {
-    // Check for server errors with more detail
-    if (error.response?.status === 500) {
-      console.error('Server error (500) details:', {
-        message: 'Internal server error occurred when sending message',
-        possibleCauses: [
-          'Backend server issue',
-          'Database connection problems',
-          'Schema validation error',
-          'Malformed request data'
-        ],
-        requestData: {
-          recipientId,
-          contentLength: content?.length,
-          hasSubject: !!subject
-        },
-        error: error.message,
-        response: error.response?.data
+    console.log('------------- BEGIN SEND DIRECT MESSAGE -------------');
+    const timestamp = new Date().toISOString();
+    console.log('Request initiated at:', timestamp);
+    
+    if (!token) {
+      console.error('Authentication token missing when attempting to send message');
+      reject(new Error('Authentication required'));
+      return;
+    }
+
+    // Parse user data for logging
+    let userId = 'unknown';
+    let userRole = 'unknown';
+    try {
+      if (userString) {
+        const userData = JSON.parse(userString);
+        userId = userData._id || 'unknown';
+        userRole = userData.role || 'unknown';
+        console.log('User context:', { userId, userRole });
+      }
+    } catch (e) {
+      console.error('Error parsing user data:', e);
+    }
+    
+    console.log('Preparing to send message with details:', {
+      receiverId,
+      contentLength: content?.length || 0,
+      firstChars: content?.substring(0, 20) + '...',
+      API_URL,
+      userRole
+    });
+    
+    // Log token health
+    console.log('Token verification:', {
+      exists: Boolean(token),
+      length: token?.length || 0,
+      firstChars: token ? token.substring(0, 10) + '...' : 'no token'
+    });
+    
+    const xhr = new XMLHttpRequest();
+    
+    // Log original network state
+    console.log('Network state before sending:', navigator.onLine ? 'Online' : 'Offline');
+    
+    // Create request URL based on user role for better logging
+    let requestURL = `${API_URL}/messages/direct`;
+    if (userRole === 'staff') {
+      requestURL = `${API_URL}/staff/messages/direct`;
+      console.log('Using staff-specific endpoint');
+    } else if (userRole === 'admin') {
+      requestURL = `${API_URL}/admin/messages/direct`;
+      console.log('Using admin-specific endpoint');
+    }
+    
+    console.log('Sending to URL:', requestURL);
+    xhr.open('POST', requestURL, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    
+    // Add additional debugging headers
+    xhr.setRequestHeader('X-Debug-Timestamp', timestamp);
+    xhr.setRequestHeader('X-Debug-Client', 'message-service-xhr');
+    
+    xhr.onload = function() {
+      const responseTime = new Date().toISOString();
+      console.log('Response received at:', responseTime);
+      console.log('Message API response details:', {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        responseLength: xhr.responseText?.length || 0,
+        responsePreview: xhr.responseText?.substring(0, 100) || 'empty response'
       });
       
-      // Try to get the response text directly to see if there's any useful information
-      try {
-        if (error.request && error.request.response) {
-          console.error('Raw response text:', error.request.response);
-          try {
-            const parsed = JSON.parse(error.request.response);
-            console.error('Parsed error response:', parsed);
-          } catch (e) {
-            console.error('Could not parse response as JSON');
-          }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          console.log('Message sent successfully:', {
+            messageId: response._id || 'unknown',
+            timestamp: response.createdAt || 'unknown'
+          });
+          console.log('------------- END SEND DIRECT MESSAGE (SUCCESS) -------------');
+          resolve(response);
+        } catch (error) {
+          console.error('Error parsing successful response:', error);
+          console.log('Raw response:', xhr.responseText);
+          console.log('------------- END SEND DIRECT MESSAGE (PARSE ERROR) -------------');
+          reject(new Error('Invalid response format'));
         }
-      } catch (e) {
-        console.error('Error examining raw response:', e);
-      }
-    }
-  
-    // Enhanced error logging
-    const errorDetails = {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-    };
-    
-    if (error.config) {
-      errorDetails.requestUrl = error.config.url;
-      errorDetails.requestMethod = error.config.method;
-      errorDetails.requestData = error.config.data;
-    }
-    
-    console.error('Error sending message:', errorDetails);
-    
-    // Get these variables again for the fallback approach
-    const token = localStorage.getItem('token');
-    const recipientIdStr = String(recipientId);
-    const fallbackRequestData = {
-      recipientId: recipientIdStr,
-      content,
-      subject
-    };
-    
-    // Try alternative approach on server error
-    if (error.response?.status === 500) {
-      try {
-        console.log('Trying alternative fetch approach...');
-        
-        // Use fetch API as a fallback
-        const fetchResponse = await fetch(`${api.defaults.baseURL}/messages/direct`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-auth-token': token,
-            'Authorization': token ? `Bearer ${token}` : ''
-          },
-          body: JSON.stringify(fallbackRequestData),
-          credentials: 'include'
+      } else {
+        // Enhanced logging for server errors
+        console.error('Server error when sending message. Details:', {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          responseHeaders: xhr.getAllResponseHeaders(),
+          responseBody: xhr.responseText?.substring(0, 500) || 'empty response'
         });
         
-        // Try to get response text even if not ok
-        const responseText = await fetchResponse.text();
-        console.log('Fetch fallback response text:', responseText);
-        
-        if (fetchResponse.ok) {
-          try {
-            const data = JSON.parse(responseText);
-            console.log('Message sent successfully with fetch fallback:', data);
-            return data;
-          } catch (e) {
-            console.error('Could not parse successful response:', e);
-            return { success: true, message: 'Message sent but response not JSON parseable' };
-          }
-        } else {
-          console.error('Fetch fallback failed with status:', fetchResponse.status);
-          console.error('Response text:', responseText);
-          throw new Error(`Fetch fallback failed with status ${fetchResponse.status}`);
+        // Special logging for 500 errors
+        if (xhr.status === 500) {
+          console.error('SERVER ERROR 500 DETECTED - Detailed diagnostics:');
+          console.log('Original request payload:', JSON.stringify({
+            receiverId, 
+            content: content?.substring(0, 50) + '...',
+            timestamp,
+            userId,
+            userRole
+          }));
+          console.log('Headers sent:', {
+            'Content-Type': 'application/json',
+            'Authorization': token ? 'Bearer token exists (hidden)' : 'No token'
+          });
+          console.log('Expected server route handler: POST /messages/direct');
+          console.log('Potential server issues:');
+          console.log('1. Database connection error');
+          console.log('2. Invalid request format');
+          console.log('3. Server exception during processing');
+          console.log('4. Missing required fields or validation error');
         }
-      } catch (fetchError) {
-        console.error('Fetch fallback failed:', fetchError);
+        
+        // Try to parse error message if available
+        try {
+          const errorData = JSON.parse(xhr.responseText);
+          console.error('Parsed error data:', errorData);
+          console.log('------------- END SEND DIRECT MESSAGE (SERVER ERROR) -------------');
+          reject(new Error(`${xhr.status} ${errorData.message || xhr.statusText}`));
+        } catch (e) {
+          // If can't parse, use status text
+          console.log('------------- END SEND DIRECT MESSAGE (UNPARSABLE ERROR) -------------');
+          reject(new Error(`${xhr.status} ${xhr.statusText}`));
+        }
       }
-    }
+    };
     
-    throw error;
-  }
+    xhr.onerror = function() {
+      console.error('Network error when sending message. Details:', {
+        readyState: xhr.readyState,
+        status: xhr.status,
+        statusText: xhr.statusText,
+        networkState: navigator.onLine ? 'Online' : 'Offline'
+      });
+      
+      // Additional diagnostic information for network errors
+      console.log('Network diagnostics:');
+      console.log('1. Browser reports online status:', navigator.onLine);
+      console.log('2. API URL being accessed:', requestURL);
+      console.log('3. Request readyState:', xhr.readyState);
+      
+      console.log('------------- END SEND DIRECT MESSAGE (NETWORK ERROR) -------------');
+      reject(new Error('Network error occurred'));
+    };
+    
+    xhr.ontimeout = function() {
+      console.error('Request timeout when sending message');
+      console.log('Timeout diagnostics:');
+      console.log('1. Timeout value (ms):', xhr.timeout);
+      console.log('2. API URL being accessed:', requestURL);
+      console.log('------------- END SEND DIRECT MESSAGE (TIMEOUT) -------------');
+      reject(new Error('Request timed out'));
+    };
+    
+    // Set timeout to 15 seconds
+    xhr.timeout = 15000;
+    
+    // Include additional diagnostic information in the payload
+    const data = JSON.stringify({
+      receiverId,
+      content,
+      _debug: {
+        clientTimestamp: timestamp,
+        clientUserRole: userRole,
+        clientRequestId: Math.random().toString(36).substring(2, 15)
+      }
+    });
+    
+    console.log('Sending message payload:', {
+      receiverId,
+      contentPreview: content?.substring(0, 30) + '...',
+      contentLength: content?.length || 0,
+      payloadSize: data.length
+    });
+    
+    try {
+      xhr.send(data);
+      console.log('XHR request initiated successfully');
+    } catch (error) {
+      console.error('Exception when sending XHR request:', error);
+      console.log('Exception details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      console.log('------------- END SEND DIRECT MESSAGE (SEND EXCEPTION) -------------');
+      reject(error);
+    }
+  });
 };
 
 // Mark messages from a specific sender as read
 export const markMessagesAsRead = async (senderId) => {
   try {
     console.log('Marking messages as read from:', senderId);
-    const response = await api.put(`/messages/read/${senderId}`);
+    
+    // Get user role from localStorage
+    const userString = localStorage.getItem('user');
+    let userObj = null;
+    
+    try {
+      userObj = userString ? JSON.parse(userString) : null;
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+    }
+    
+    // Choose the appropriate endpoint based on user role
+    let endpoint = `/messages/read/${senderId}`;
+    
+    if (userObj && userObj.role === 'staff') {
+      endpoint = `/staff/messages/read/${senderId}`;
+      console.log('Using staff read endpoint');
+    } else if (userObj && userObj.role === 'admin') {
+      endpoint = `/admin/messages/read/${senderId}`;
+      console.log('Using admin read endpoint');
+    } else {
+      console.log('Using standard read endpoint');
+    }
+    
+    const response = await api.put(endpoint);
     console.log('Messages marked as read successfully:', response.data);
     return response.data;
   } catch (error) {

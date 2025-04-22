@@ -78,7 +78,7 @@ router.put('/:id/cancel', auth, cancelBooking);
 // Validate access code
 router.post('/validate-code', auth, validateAccessCode);
 
-// Complete booking - enabling this route again
+// Complete booking - moved to staff routes
 router.put('/complete', [auth, authorize(['staff', 'admin'])], completeBooking);
 
 module.exports = router;

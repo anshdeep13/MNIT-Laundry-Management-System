@@ -39,7 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { testMessageService, sendDirectMessage, diagnoseBackendServer } from '../services/message';
+import { testMessageService, sendDirectMessage, diagnoseBackendServer, getDirectMessages, getAllMessages, markMessagesAsRead } from '../services/message';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -69,26 +69,11 @@ const Messages = () => {
   const fetchMessages = async () => {
     try {
       console.log('Fetching messages for user:', user._id);
+      setLoading(true);
       
-      // Use direct fetch instead of api service
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${api.defaults.baseURL}/messages`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'x-auth-token': token,
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages with status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Messages fetched successfully:', data);
-      setMessages(data);
+      // Use the message service instead of custom implementation
+      const messages = await getAllMessages();
+      setMessages(messages);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -127,124 +112,79 @@ const Messages = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
-
+    if (!newMessage.trim()) return;
+    
+    // Capture input before clearing
+    const messageContent = newMessage.trim();
+    console.log('Preparing to send message:', {
+      receiverId: selectedUser._id,
+      contentLength: messageContent.length,
+      timeStamp: new Date().toISOString()
+    });
+    
+    setLoading(true);
+    
     try {
-      console.log('Sending message to:', selectedUser._id, 'with content:', newMessage);
-
-      // Ensure we have a clean string value for the ID
-      const recipientId = String(selectedUser._id).trim();
+      console.log('Calling sendDirectMessage API...');
+      const response = await sendDirectMessage(selectedUser._id, messageContent);
+      console.log('sendDirectMessage API response:', response);
       
-      // Try multiple approaches to send the message
-      const attempts = [
-        // Attempt 1: Standard format with messages endpoint
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/messages/direct`,
-          payload: { recipientId, content: newMessage, subject: "" }
-        },
-        // Attempt 2: Alternative format with slightly different payload structure
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/messages/direct`,
-          payload: { 
-            recipient: recipientId, 
-            recipientId,
-            message: newMessage,
-            content: newMessage,
-            subject: "",
-            type: "direct" 
-          }
-        },
-        // Attempt 3: Try a student-specific endpoint if it exists
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/student/messages/direct`,
-          payload: { recipientId, content: newMessage, subject: "" }
-        }
-      ];
-
-      let successfulResponse = null;
-      let lastError = null;
-
-      // Try each approach until one succeeds
-      for (const attempt of attempts) {
-        try {
-          console.log(`Trying to send message with URL: ${attempt.url}`);
-          console.log('Payload:', attempt.payload);
-          
-          const token = localStorage.getItem('token');
-          const response = await fetch(attempt.url, {
-            method: attempt.method,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'x-auth-token': token,
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(attempt.payload),
-            credentials: 'include'
-          });
-          
-          if (response.ok) {
-            console.log('Message sent successfully with attempt:', attempt);
-            successfulResponse = response;
-            break;
-          } else {
-            const errorText = await response.text();
-            console.warn(`Attempt failed with status ${response.status}:`, errorText);
-            lastError = { status: response.status, text: errorText, attempt };
-          }
-        } catch (err) {
-          console.error('Error with attempt:', err);
-          lastError = { error: err, attempt };
-        }
-      }
-
-      // If any attempt succeeded
-      if (successfulResponse) {
-        // Refresh messages
-        await fetchMessages();
-        // Clear the input
-        setNewMessage('');
-        // Clear any previous errors
-        setError(null);
-        return;
-      }
+      setMessages(prevMessages => [...prevMessages, { 
+        senderId: user._id, 
+        content: messageContent,
+        createdAt: new Date().toISOString()
+      }]);
       
-      // If all attempts failed
-      throw new Error(`All message sending attempts failed. Last error: ${lastError?.status || lastError?.error?.message}`);
+      setNewMessage('');
+      console.log('Message sent successfully and state updated');
     } catch (error) {
-      console.error('Error sending message:', error);
-      setError(`Failed to send message: ${error.message}. Please try again later.`);
-      // Keep the message in the input so the user can try again without retyping
+      console.error('Error in handleSendMessage:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Keep the message in the input field for retry
+      // Only clear setNewMessage() if successful
+      
+      // Custom error messages based on error type
+      if (error.message && error.message.includes('500')) {
+        setError('Server error: The message could not be sent due to a server issue. Please try again later.');
+        console.error('Server error (500) detected when sending message');
+      } else if (error.message && error.message.includes('401')) {
+        setError('Authentication error: Please log in again to send messages.');
+        console.error('Authentication error (401) detected when sending message');
+      } else if (error.message && error.message.includes('Network')) {
+        setError('Network error: Please check your internet connection and try again.');
+        console.error('Network error detected when sending message');
+      } else {
+        setError(`Failed to send message: ${error.message || 'Unknown error'}`);
+        console.error('Unknown error type detected when sending message');
+      }
+    } finally {
+      setLoading(false);
+      console.log('Message sending process completed, loading state reset');
     }
   };
 
   const handleUserSelect = async (selectedUser) => {
     setSelectedUser(selectedUser);
     try {
-      // Mark messages as read using direct fetch
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${api.defaults.baseURL}/messages/read/${selectedUser._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-auth-token': token,
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
+      setLoading(true);
       
-      if (!response.ok) {
-        console.warn(`Failed to mark messages as read with status: ${response.status}`);
-      }
+      // Get direct messages with selected user
+      const messages = await getDirectMessages(selectedUser._id);
+      setMessages(messages);
       
-      // Refresh messages to update read status
-      await fetchMessages();
+      // Mark messages as read using service
+      await markMessagesAsRead(selectedUser._id);
+      
+      setLoading(false);
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error('Error loading conversation:', error);
+      setError('Failed to load conversation. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -760,6 +700,63 @@ const Messages = () => {
                     <SendIcon />
                   </Button>
                 </Box>
+                
+                {/* Emergency send option when message sending fails */}
+                {newMessage.trim() && error && error.includes('500') && (
+                  <Box mt={1} display="flex" justifyContent="flex-end">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="warning"
+                      onClick={async () => {
+                        try {
+                          const token = localStorage.getItem('token');
+                          setError("Trying emergency send approach...");
+                          
+                          // Create a minimal XHR request
+                          const xhr = new XMLHttpRequest();
+                          xhr.open('POST', `${api.defaults.baseURL}/messages/direct`, true);
+                          xhr.setRequestHeader('Content-Type', 'application/json');
+                          xhr.setRequestHeader('x-auth-token', token);
+                          
+                          // Create a simple promise to handle the XHR
+                          const result = await new Promise((resolve, reject) => {
+                            xhr.onload = function() {
+                              if (this.status >= 200 && this.status < 300) {
+                                resolve({ success: true });
+                              } else {
+                                reject(new Error(`XHR failed with status ${xhr.status}`));
+                              }
+                            };
+                            
+                            xhr.onerror = function() {
+                              reject(new Error('XHR request failed'));
+                            };
+                            
+                            // Use absolute minimal payload
+                            xhr.send(JSON.stringify({ 
+                              recipientId: selectedUser._id, 
+                              content: newMessage 
+                            }));
+                          });
+                          
+                          // If we get here, the message was sent successfully
+                          setError(null);
+                          setNewMessage('');
+                          
+                          // Refresh messages
+                          const messages = await getDirectMessages(selectedUser._id);
+                          setMessages(messages);
+                        } catch (err) {
+                          console.error('Emergency send failed:', err);
+                          setError(`Emergency send failed: ${err.message}. Please try again later.`);
+                        }
+                      }}
+                    >
+                      Try Ultra Simple Send
+                    </Button>
+                  </Box>
+                )}
               </>
             ) : (
               <Box 

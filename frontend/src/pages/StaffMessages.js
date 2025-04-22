@@ -311,123 +311,195 @@ const StaffMessages = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedUser) return;
-
+    if (!newMessage.trim()) return;
+    
+    // Capture input before clearing
+    const messageContent = newMessage.trim();
+    console.group('STAFF MESSAGE SEND OPERATION');
+    console.log('Message send operation started', {
+      timestamp: new Date().toISOString(),
+      staffId: user._id,
+      staffName: user.name,
+      studentId: selectedUser._id,
+      studentName: selectedUser.name,
+      messageLength: messageContent.length,
+      userAgent: navigator.userAgent,
+      userRole: user.role
+    });
+    
+    setLoading(true);
+    
     try {
-      console.log('Sending message to:', selectedUser._id, 'with content:', newMessage);
-
-      // Make sure selectedUser._id is a string
-      const recipientId = String(selectedUser._id).trim();
-      
-      // Try three different payload formats to handle potential server issues
-      const attempts = [
-        // Attempt 1: Standard format
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/messages/direct`,
-          payload: { recipientId, content: newMessage, subject: "" }
-        },
-        // Attempt 2: Using staff-specific endpoint
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/staff/messages/direct`,
-          payload: { recipientId, content: newMessage, subject: "" }
-        },
-        // Attempt 3: Alternative format (some APIs expect different field names)
-        {
-          method: 'POST',
-          url: `${api.defaults.baseURL}/messages/direct`,
-          payload: { 
-            recipient: recipientId, 
-            recipientId,
-            message: newMessage, 
-            content: newMessage, 
-            subject: "",
-            type: "direct" 
-          }
+      console.log('Environment information:', {
+        apiBaseUrl: api.defaults.baseURL,
+        environment: process.env.NODE_ENV,
+        apiTimeout: api.defaults.timeout || 'default',
+        localStorage: {
+          tokenExists: !!localStorage.getItem('token'),
+          userExists: !!localStorage.getItem('user')
         }
-      ];
-
-      let successfulResponse = null;
-      let lastError = null;
-
-      // Try each approach until one works
-      for (const attempt of attempts) {
-        try {
-          console.log(`Trying message send attempt with URL: ${attempt.url}`);
-          console.log('Payload:', attempt.payload);
-          
-          const token = localStorage.getItem('token');
-          const response = await fetch(attempt.url, {
-            method: attempt.method,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'x-auth-token': token,
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(attempt.payload),
-            credentials: 'include'
-          });
-          
-          // If successful, store response and break loop
-          if (response.ok) {
-            console.log('Message sent successfully with attempt:', attempt);
-            successfulResponse = response;
-            break;
-          } else {
-            // If not successful, log error and continue to next attempt
-            const errorText = await response.text();
-            console.warn(`Attempt failed with status ${response.status}:`, errorText);
-            lastError = { status: response.status, text: errorText, attempt };
-          }
-        } catch (err) {
-          console.error('Error with attempt:', err);
-          lastError = { error: err, attempt };
-        }
-      }
-
-      // If any attempt was successful
-      if (successfulResponse) {
-        // Refresh messages
-        await fetchDirectMessages(selectedUser._id);
-        // Clear the input
-        setNewMessage('');
-        // Clear any previous errors
-        setError(null);
-        return;
-      }
+      });
       
-      // If we get here, all attempts failed
-      throw new Error(`All sending attempts failed. Last error: ${lastError?.status || lastError?.error?.message}`);
-    } catch (error) {
-      console.error('Error sending message:', error);
+      console.log('Calling sendDirectMessage API with endpoint:', `${api.defaults.baseURL}/messages/direct`);
+      console.log('Request payload:', {
+        receiverId: selectedUser._id,
+        content: messageContent.substring(0, 50) + (messageContent.length > 50 ? '...' : '')
+      });
       
-      // Show error message but also save locally
-      setError(`Message sending failed: ${error.message}. Message saved locally.`);
+      const startTime = performance.now();
+      console.log('About to call sendDirectMessage function - ' + new Date().toISOString());
+      const response = await sendDirectMessage(selectedUser._id, messageContent);
+      const endTime = performance.now();
       
-      // Save message locally since server failed
-      const localMessage = {
-        sender: user._id,
-        receiver: selectedUser._id,
-        content: newMessage,
-        senderName: user.name,
-        receiverName: selectedUser.name
-      };
+      console.log('sendDirectMessage API response received - ' + new Date().toISOString(), {
+        status: 'success',
+        responseType: typeof response,
+        responseId: response?._id || 'unknown',
+        responseTimestamp: response?.createdAt || 'unknown'
+      });
+      console.log('Request duration:', (endTime - startTime).toFixed(2) + 'ms');
       
-      const updatedMessages = saveLocalMessage(localMessage);
-      console.log('Message saved locally:', localMessage);
+      setMessages(prevMessages => [...prevMessages, { 
+        senderId: user._id, 
+        content: messageContent,
+        createdAt: new Date().toISOString()
+      }]);
       
-      // Update UI with local messages
-      const relevantLocalMessages = updatedMessages.filter(msg => 
-        (msg.sender === user._id && msg.receiver === selectedUser._id) ||
-        (msg.sender === selectedUser._id && msg.receiver === user._id)
-      );
-      
-      setMessages(relevantLocalMessages);
       setNewMessage('');
-      setLocalMode(true);
-      setShowSnackbar(true);
+      console.log('Message sent successfully and state updated');
+    } catch (error) {
+      console.error('---------- ERROR IN HANDLE SEND MESSAGE ----------');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      
+      // Enhanced error details
+      const errorDetails = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data
+      };
+      console.error('Error details:', errorDetails);
+      
+      // System state information
+      console.log('System state at error time:', {
+        networkState: navigator.onLine ? 'Online' : 'Offline',
+        memoryInfo: performance?.memory ? {
+          jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+          totalJSHeapSize: performance.memory.totalJSHeapSize,
+          usedJSHeapSize: performance.memory.usedJSHeapSize
+        } : 'Not available',
+        timeOrigin: performance.timeOrigin,
+        apiBaseURL: api.defaults.baseURL,
+        selectedUserState: selectedUser ? {
+          _id: selectedUser._id,
+          role: selectedUser.role
+        } : 'No user selected'
+      });
+      
+      // Check for specific error types to give more detailed logging
+      console.log('Network state:', navigator.onLine ? 'Online' : 'Offline');
+      console.log('API base URL used:', api.defaults.baseURL);
+      
+      // Additional diagnostics for network problems
+      try {
+        const pingStart = performance.now();
+        fetch(`${api.defaults.baseURL}/health`, { 
+          method: 'GET',
+          mode: 'no-cors',
+          cache: 'no-cache'
+        })
+          .then(() => {
+            const pingEnd = performance.now();
+            console.log('Server ping test succeeded:', (pingEnd - pingStart).toFixed(2) + 'ms');
+          })
+          .catch(err => {
+            console.error('Server ping test failed:', err.message);
+          });
+      } catch (pingError) {
+        console.error('Error during ping test:', pingError);
+      }
+      
+      // Custom error messages based on error type
+      if (error.message && error.message.includes('500')) {
+        setError('Server error: The message could not be sent due to a server issue. Please try again later.');
+        console.error('Server error (500) detected when sending message');
+        
+        // Additional diagnostics for 500 error
+        console.log('Attempting to diagnose 500 error. This could be:');
+        console.log('1. Backend validation error');
+        console.log('2. Database connection issue');
+        console.log('3. Internal server exception');
+        console.log('4. Message format or encoding issue');
+        
+        // Try to log possible problematic characters
+        if (messageContent) {
+          const specialChars = messageContent.match(/[^\w\s]/g);
+          console.log('Message contains special characters:', specialChars ? specialChars.join('') : 'none');
+          
+          // Check for emoji or other non-ASCII characters
+          const nonASCII = messageContent.match(/[^\x00-\x7F]/g);
+          console.log('Message contains non-ASCII characters:', nonASCII ? nonASCII.join('') : 'none');
+          
+          // Check message length
+          console.log('Message length (bytes):', new Blob([messageContent]).size);
+        }
+      } else if (error.message && error.message.includes('401')) {
+        setError('Authentication error: Please log in again to send messages.');
+        console.error('Authentication error (401) detected when sending message');
+        
+        // Token diagnostics
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            // Check if token is valid JSON Web Token format
+            const tokenParts = token.split('.');
+            console.log('Token format check:', {
+              isCorrectFormat: tokenParts.length === 3,
+              parts: tokenParts.length,
+              firstChars: token.substring(0, 10) + '...'
+            });
+            
+            // Try to decode payload without verification (just for debugging)
+            if (tokenParts.length === 3) {
+              try {
+                const decoded = JSON.parse(atob(tokenParts[1]));
+                console.log('Token payload valid JSON:', true);
+                console.log('Token expiry time:', new Date(decoded.exp * 1000).toISOString());
+                console.log('Token is expired:', Date.now() > decoded.exp * 1000);
+              } catch (e) {
+                console.log('Token payload is not valid JSON');
+              }
+            }
+          } catch (e) {
+            console.error('Error analyzing token:', e.message);
+          }
+        } else {
+          console.log('No token found in localStorage');
+        }
+      } else if (error.message && error.message.includes('Network')) {
+        setError('Network error: Please check your internet connection and try again.');
+        console.error('Network error detected when sending message');
+        
+        // Additional network diagnostics
+        if ('connection' in navigator) {
+          console.log('Connection information:', {
+            downlink: navigator.connection.downlink,
+            effectiveType: navigator.connection.effectiveType,
+            rtt: navigator.connection.rtt,
+            saveData: navigator.connection.saveData
+          });
+        }
+      } else {
+        setError(`Failed to send message: ${error.message || 'Unknown error'}`);
+        console.error('Unknown error type detected when sending message');
+      }
+    } finally {
+      setLoading(false);
+      console.log('Message sending process completed, loading state reset');
+      console.groupEnd();
     }
   };
 
@@ -729,37 +801,73 @@ const StaffMessages = () => {
                       variant="outlined"
                       onClick={async () => {
                         try {
-                          // Ultra-simplified message sending - last resort approach
-                          const payload = JSON.stringify({
-                            recipientId: selectedUser._id,
-                            content: newMessage,
-                          });
-                          
+                          // Use XMLHttpRequest as a last resort (most basic approach)
                           const token = localStorage.getItem('token');
-                          const response = await fetch(`${api.defaults.baseURL}/messages/direct`, {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'x-auth-token': token,
-                            },
-                            body: payload,
-                            credentials: 'omit'  // Try without credentials as a last resort
+                          setError("Attempting ultra simple send...");
+                          
+                          // Create a minimal XHR request
+                          const xhr = new XMLHttpRequest();
+                          xhr.open('POST', `${api.defaults.baseURL}/staff/messages/direct`, true);
+                          xhr.setRequestHeader('Content-Type', 'application/json');
+                          xhr.setRequestHeader('x-auth-token', token);
+                          
+                          // Create a simple promise to handle the XHR
+                          const result = await new Promise((resolve, reject) => {
+                            xhr.onload = function() {
+                              if (this.status >= 200 && this.status < 300) {
+                                resolve({ success: true });
+                              } else if (this.status === 500) {
+                                // If failed, try alternative endpoint
+                                const altXhr = new XMLHttpRequest();
+                                altXhr.open('POST', `${api.defaults.baseURL}/messages/direct`, true);
+                                altXhr.setRequestHeader('Content-Type', 'application/json');
+                                altXhr.setRequestHeader('x-auth-token', token);
+                                
+                                altXhr.onload = function() {
+                                  if (this.status >= 200 && this.status < 300) {
+                                    resolve({ success: true, alternative: true });
+                                  } else {
+                                    reject(new Error(`All XHR attempts failed. Status: ${this.status}`));
+                                  }
+                                };
+                                
+                                altXhr.onerror = function() {
+                                  reject(new Error('Alternative XHR failed'));
+                                };
+                                
+                                // Use absolute minimal payload for alternative
+                                altXhr.send(JSON.stringify({ 
+                                  recipientId: selectedUser._id,
+                                  content: newMessage 
+                                }));
+                              } else {
+                                reject(new Error(`XHR failed with status ${xhr.status}`));
+                              }
+                            };
+                            
+                            xhr.onerror = function() {
+                              reject(new Error('XHR request failed'));
+                            };
+                            
+                            // Use absolute minimal payload
+                            xhr.send(JSON.stringify({ 
+                              recipientId: selectedUser._id,
+                              content: newMessage 
+                            }));
                           });
                           
-                          if (response.ok) {
-                            setError(null);
-                            setNewMessage('');
-                            await fetchDirectMessages(selectedUser._id);
-                          } else {
-                            setError(`Alternative send failed with status: ${response.status}`);
-                          }
+                          // If we get here, the message was sent successfully
+                          setError(null);
+                          setNewMessage('');
+                          await fetchDirectMessages(selectedUser._id);
                         } catch (err) {
-                          setError(`Alternative send error: ${err.message}`);
+                          console.error('Ultra simple send failed:', err);
+                          setError(`Ultra simple send failed: ${err.message}. Please try direct API access.`);
                         }
                       }}
                       sx={{ borderRadius: '24px' }}
                     >
-                      Try Alternative Send
+                      Try Ultra Simple Send
                     </Button>
                   </Box>
                 )}

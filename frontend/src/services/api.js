@@ -95,8 +95,8 @@ export const staffAPI = {
   // Update machine status
   updateMachineStatus: (machineId, data) => API.patch(`/staff/machines/${machineId}/status`, data),
   
-  // Complete booking - fix the endpoint to match backend route
-  completeBooking: (bookingId) => API.put('/bookings/complete', { bookingId }),
+  // Complete booking - using the staff route
+  completeBooking: (bookingId) => API.put('/staff/bookings/complete', { bookingId }),
   
   // Get all hostels
   getHostels: () => API.get('/staff/hostels'),
@@ -139,6 +139,24 @@ export const authAPI = {
   
   // Logout user
   logout: () => API.post('/auth/logout'),
+};
+
+// Wallet API functions
+export const walletAPI = {
+  // Create order for wallet recharge
+  createOrder: (amount) => API.post('/wallet/create-order', { amount }),
+  
+  // Verify payment
+  verifyPayment: (paymentData) => API.post('/wallet/verify-payment', paymentData),
+  
+  // Get wallet transaction history
+  getHistory: () => API.get('/wallet/transactions'),
+  
+  // Request refund
+  requestRefund: (paymentId, reason) => API.post('/wallet/refund', { paymentId, reason }),
+  
+  // Get wallet details
+  getWallet: () => API.get('/wallet')
 };
 
 export default API; 

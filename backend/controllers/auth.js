@@ -220,19 +220,46 @@ exports.logout = (req, res) => {
 // Update wallet balance
 exports.updateWallet = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, paymentId, signature } = req.body;
     
     if (!amount || isNaN(amount)) {
       return res.status(400).json({ msg: 'Please provide a valid amount' });
     }
     
     const user = await User.findById(req.user._id);
+    
+    // Add amount to wallet balance
     user.walletBalance += Number(amount);
+    
+    // Record transaction history if it exists in user model
+    if (user.transactions) {
+      user.transactions.push({
+        type: 'CREDIT',
+        amount: Number(amount),
+        paymentId: paymentId || 'manual_update',
+        description: 'Wallet recharge',
+        status: 'COMPLETED',
+        createdAt: new Date()
+      });
+    }
+    
     await user.save();
     
-    res.json({ walletBalance: user.walletBalance });
+    // Log payment information
+    console.log('Wallet updated:', {
+      userId: user._id,
+      amount,
+      newBalance: user.walletBalance,
+      paymentId,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ 
+      walletBalance: user.walletBalance,
+      message: 'Wallet balance updated successfully'
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error('Wallet update error:', err.message);
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 };

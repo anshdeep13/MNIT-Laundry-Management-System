@@ -365,41 +365,6 @@ const StaffDashboard = () => {
     );
   };
   
-  // Add a function to get booking details before attempting to complete it
-  const getAndLogBookingDetails = async (bookingId) => {
-    try {
-      // Find the booking in the current data
-      const bookingInAll = bookings.find(b => b._id === bookingId);
-      const hostelsWithBooking = bookingsByHostel.filter(h => 
-        h.bookings.some(b => b._id === bookingId)
-      );
-      
-      const bookingInByHostel = hostelsWithBooking.length > 0 
-        ? hostelsWithBooking[0].bookings.find(b => b._id === bookingId)
-        : null;
-      
-      const booking = bookingInAll || bookingInByHostel;
-      
-      if (booking) {
-        console.log('Attempting to complete booking with details:', {
-          id: booking._id,
-          status: booking.status,
-          startTime: booking.startTime,
-          endTime: booking.endTime,
-          user: booking.user?.name,
-          machine: booking.machine?.name
-        });
-      } else {
-        console.log('Booking not found in local state, ID:', bookingId);
-      }
-      
-      return booking?.status;
-    } catch (err) {
-      console.error('Error getting booking details:', err);
-      return null;
-    }
-  };
-  
   // Handle booking completion
   const handleCompleteBooking = async (bookingId) => {
     try {
@@ -407,11 +372,7 @@ const StaffDashboard = () => {
       setError(null);
       setSuccessMessage(null);
       
-      // Get booking details for debugging
-      const status = await getAndLogBookingDetails(bookingId);
-      console.log('Booking status before completion attempt:', status);
-      
-      console.log('Sending complete booking request with ID:', bookingId);
+      console.log('Completing booking:', bookingId);
       
       // Call the API to complete the booking
       const response = await staffAPI.completeBooking(bookingId);
@@ -430,16 +391,7 @@ const StaffDashboard = () => {
       setLoading(false);
     } catch (err) {
       console.error('Error completing booking:', err);
-      
-      // Display the specific error message from the API if available
-      const errorMsg = err.data?.msg || err.message || 'Unknown error';
-      setError(`Failed to complete booking: ${errorMsg}`);
-      
-      // Log more details to help debugging
-      if (err.data) {
-        console.log('Error details:', err.data);
-      }
-      
+      setError(`Failed to complete booking: ${err.message || 'Unknown error'}`);
       setLoading(false);
     }
   };
@@ -490,7 +442,7 @@ const StaffDashboard = () => {
                       <TableCell>End Time</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Payment</TableCell>
-                      <TableCell width="140px">Actions</TableCell>
+                      <TableCell>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -526,15 +478,15 @@ const StaffDashboard = () => {
                         </TableCell>
                         <TableCell>
                           {(booking.status === 'in-progress' || booking.status === 'confirmed') && (
-                            <Button
-                              variant="contained"
-                              color="success"
-                              size="small"
-                              startIcon={<CheckCircleOutlineIcon />}
-                              onClick={() => handleCompleteBooking(booking._id)}
-                            >
-                              Complete
-                            </Button>
+                            <Tooltip title="Complete Booking">
+                              <IconButton 
+                                size="small" 
+                                color="primary" 
+                                onClick={() => handleCompleteBooking(booking._id)}
+                              >
+                                <CheckCircleOutlineIcon />
+                              </IconButton>
+                            </Tooltip>
                           )}
                         </TableCell>
                       </TableRow>
@@ -780,7 +732,7 @@ const StaffDashboard = () => {
                     <TableCell>End Time</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Payment</TableCell>
-                    <TableCell width="140px">Actions</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -817,15 +769,15 @@ const StaffDashboard = () => {
                       </TableCell>
                       <TableCell>
                         {(booking.status === 'in-progress' || booking.status === 'confirmed') && (
-                          <Button
-                            variant="contained"
-                            color="success"
-                            size="small"
-                            startIcon={<CheckCircleOutlineIcon />}
-                            onClick={() => handleCompleteBooking(booking._id)}
-                          >
-                            Complete
-                          </Button>
+                          <Tooltip title="Complete Booking">
+                            <IconButton 
+                              size="small" 
+                              color="primary" 
+                              onClick={() => handleCompleteBooking(booking._id)}
+                            >
+                              <CheckCircleOutlineIcon />
+                            </IconButton>
+                          </Tooltip>
                         )}
                       </TableCell>
                     </TableRow>
