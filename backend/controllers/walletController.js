@@ -1,4 +1,4 @@
-const Wallet = require('../models/wallet');
+const Wallet = require('../models/Wallet');
 const PaymentService = require('../services/paymentService');
 
 class WalletController {

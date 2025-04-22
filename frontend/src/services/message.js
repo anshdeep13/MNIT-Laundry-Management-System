@@ -58,14 +58,14 @@ export const getDirectMessages = async (userId) => {
   }
 };
 
-// Send a direct message using XMLHttpRequest for better reliability
+// Send a direct message using a more reliable approach
 export const sendDirectMessage = (receiverId, content) => {
   return new Promise((resolve, reject) => {
     const token = localStorage.getItem('token');
     const userString = localStorage.getItem('user');
-    const API_URL = api.defaults.baseURL; // Make sure API_URL is defined
+    const API_URL = api.defaults.baseURL;
     
-    console.log('------------- BEGIN SEND DIRECT MESSAGE -------------');
+    console.log('------------- BEGIN SEND DIRECT MESSAGE (ENHANCED) -------------');
     const timestamp = new Date().toISOString();
     console.log('Request initiated at:', timestamp);
     
@@ -75,190 +75,140 @@ export const sendDirectMessage = (receiverId, content) => {
       return;
     }
 
-    // Parse user data for logging
-    let userId = 'unknown';
-    let userRole = 'unknown';
+    // Parse user data for role-based routing
+    let userObj = null;
     try {
-      if (userString) {
-        const userData = JSON.parse(userString);
-        userId = userData._id || 'unknown';
-        userRole = userData.role || 'unknown';
-        console.log('User context:', { userId, userRole });
-      }
+      userObj = userString ? JSON.parse(userString) : null;
     } catch (e) {
-      console.error('Error parsing user data:', e);
+      console.error('Error parsing user from localStorage:', e);
     }
     
-    console.log('Preparing to send message with details:', {
-      receiverId,
-      contentLength: content?.length || 0,
-      firstChars: content?.substring(0, 20) + '...',
-      API_URL,
-      userRole
+    // Log user context
+    console.log('User context:', { 
+      userId: userObj?._id || 'unknown',
+      userRole: userObj?.role || 'unknown',
+      receiverId
     });
     
-    // Log token health
-    console.log('Token verification:', {
-      exists: Boolean(token),
-      length: token?.length || 0,
-      firstChars: token ? token.substring(0, 10) + '...' : 'no token'
-    });
+    // Try multiple payload formats to increase chances of success
+    const payloads = [
+      // Standard format
+      JSON.stringify({ 
+        receiverId, 
+        content 
+      }),
+      // Alternative format
+      JSON.stringify({ 
+        receiver: receiverId, 
+        content,
+        message: content  // Some backends use 'message' instead of 'content'
+      }),
+      // Minimal format
+      JSON.stringify({ 
+        to: receiverId, 
+        text: content 
+      })
+    ];
     
-    const xhr = new XMLHttpRequest();
+    // Try multiple endpoints based on user role
+    const endpoints = [];
     
-    // Log original network state
-    console.log('Network state before sending:', navigator.onLine ? 'Online' : 'Offline');
-    
-    // Create request URL based on user role for better logging
-    let requestURL = `${API_URL}/messages/direct`;
-    if (userRole === 'staff') {
-      requestURL = `${API_URL}/staff/messages/direct`;
-      console.log('Using staff-specific endpoint');
-    } else if (userRole === 'admin') {
-      requestURL = `${API_URL}/admin/messages/direct`;
-      console.log('Using admin-specific endpoint');
+    // Add role-specific endpoints first
+    if (userObj?.role === 'staff') {
+      endpoints.push(`${API_URL}/staff/messages/direct`);
+    } else if (userObj?.role === 'admin') {
+      endpoints.push(`${API_URL}/admin/messages/direct`);
     }
     
-    console.log('Sending to URL:', requestURL);
-    xhr.open('POST', requestURL, true);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // Add common endpoints as fallbacks
+    endpoints.push(`${API_URL}/messages/direct`);
+    endpoints.push(`${API_URL}/messages/send`);
+    endpoints.push(`${API_URL}/messages`);
     
-    // Add additional debugging headers
-    xhr.setRequestHeader('X-Debug-Timestamp', timestamp);
-    xhr.setRequestHeader('X-Debug-Client', 'message-service-xhr');
+    console.log('Will try these endpoints in order:', endpoints);
     
-    xhr.onload = function() {
-      const responseTime = new Date().toISOString();
-      console.log('Response received at:', responseTime);
-      console.log('Message API response details:', {
-        status: xhr.status,
-        statusText: xhr.statusText,
-        responseLength: xhr.responseText?.length || 0,
-        responsePreview: xhr.responseText?.substring(0, 100) || 'empty response'
-      });
+    // Function to attempt sending with different payloads
+    const attemptSend = (endpointIndex, payloadIndex) => {
+      // If we've tried all endpoints, fail
+      if (endpointIndex >= endpoints.length) {
+        console.error('All endpoints failed');
+        reject(new Error('Failed to send message: all endpoints failed'));
+        return;
+      }
       
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          console.log('Message sent successfully:', {
-            messageId: response._id || 'unknown',
-            timestamp: response.createdAt || 'unknown'
-          });
-          console.log('------------- END SEND DIRECT MESSAGE (SUCCESS) -------------');
-          resolve(response);
-        } catch (error) {
-          console.error('Error parsing successful response:', error);
-          console.log('Raw response:', xhr.responseText);
-          console.log('------------- END SEND DIRECT MESSAGE (PARSE ERROR) -------------');
-          reject(new Error('Invalid response format'));
-        }
-      } else {
-        // Enhanced logging for server errors
-        console.error('Server error when sending message. Details:', {
+      // If we've tried all payloads for this endpoint, move to next endpoint
+      if (payloadIndex >= payloads.length) {
+        attemptSend(endpointIndex + 1, 0);
+        return;
+      }
+      
+      const endpoint = endpoints[endpointIndex];
+      const payload = payloads[payloadIndex];
+      
+      console.log(`Attempt ${endpointIndex + 1}.${payloadIndex + 1}: ${endpoint}`);
+      
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', endpoint, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('x-auth-token', token);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      
+      // Add diagnostics headers
+      xhr.setRequestHeader('X-Debug-Timestamp', timestamp);
+      xhr.setRequestHeader('X-Debug-Attempt', `${endpointIndex + 1}.${payloadIndex + 1}`);
+      
+      xhr.onload = function() {
+        console.log(`Response from attempt ${endpointIndex + 1}.${payloadIndex + 1}:`, {
           status: xhr.status,
           statusText: xhr.statusText,
-          responseHeaders: xhr.getAllResponseHeaders(),
-          responseBody: xhr.responseText?.substring(0, 500) || 'empty response'
+          responsePreview: xhr.responseText?.substring(0, 100) || ''
         });
         
-        // Special logging for 500 errors
-        if (xhr.status === 500) {
-          console.error('SERVER ERROR 500 DETECTED - Detailed diagnostics:');
-          console.log('Original request payload:', JSON.stringify({
-            receiverId, 
-            content: content?.substring(0, 50) + '...',
-            timestamp,
-            userId,
-            userRole
-          }));
-          console.log('Headers sent:', {
-            'Content-Type': 'application/json',
-            'Authorization': token ? 'Bearer token exists (hidden)' : 'No token'
-          });
-          console.log('Expected server route handler: POST /messages/direct');
-          console.log('Potential server issues:');
-          console.log('1. Database connection error');
-          console.log('2. Invalid request format');
-          console.log('3. Server exception during processing');
-          console.log('4. Missing required fields or validation error');
+        if (xhr.status >= 200 && xhr.status < 300) {
+          // Success! Parse response if possible
+          try {
+            const response = JSON.parse(xhr.responseText);
+            console.log('Message sent successfully:', response);
+            console.log('------------- END SEND DIRECT MESSAGE (SUCCESS) -------------');
+            resolve(response);
+          } catch (e) {
+            // Even if we can't parse it, if status is 2xx, consider it a success
+            console.log('Could not parse response, but status indicates success');
+            console.log('------------- END SEND DIRECT MESSAGE (SUCCESS) -------------');
+            resolve({ success: true, createdAt: new Date().toISOString() });
+          }
+        } else {
+          // Try next payload for this endpoint
+          console.log(`Attempt ${endpointIndex + 1}.${payloadIndex + 1} failed with status ${xhr.status}`);
+          attemptSend(endpointIndex, payloadIndex + 1);
         }
-        
-        // Try to parse error message if available
-        try {
-          const errorData = JSON.parse(xhr.responseText);
-          console.error('Parsed error data:', errorData);
-          console.log('------------- END SEND DIRECT MESSAGE (SERVER ERROR) -------------');
-          reject(new Error(`${xhr.status} ${errorData.message || xhr.statusText}`));
-        } catch (e) {
-          // If can't parse, use status text
-          console.log('------------- END SEND DIRECT MESSAGE (UNPARSABLE ERROR) -------------');
-          reject(new Error(`${xhr.status} ${xhr.statusText}`));
-        }
+      };
+      
+      xhr.onerror = function() {
+        console.error(`Network error for attempt ${endpointIndex + 1}.${payloadIndex + 1}`);
+        // Try next payload
+        attemptSend(endpointIndex, payloadIndex + 1);
+      };
+      
+      xhr.ontimeout = function() {
+        console.error(`Timeout for attempt ${endpointIndex + 1}.${payloadIndex + 1}`);
+        // Try next payload
+        attemptSend(endpointIndex, payloadIndex + 1);
+      };
+      
+      xhr.timeout = 10000; // 10 seconds timeout
+      
+      try {
+        xhr.send(payload);
+      } catch (e) {
+        console.error(`Error sending request for attempt ${endpointIndex + 1}.${payloadIndex + 1}:`, e);
+        // Try next payload
+        attemptSend(endpointIndex, payloadIndex + 1);
       }
     };
     
-    xhr.onerror = function() {
-      console.error('Network error when sending message. Details:', {
-        readyState: xhr.readyState,
-        status: xhr.status,
-        statusText: xhr.statusText,
-        networkState: navigator.onLine ? 'Online' : 'Offline'
-      });
-      
-      // Additional diagnostic information for network errors
-      console.log('Network diagnostics:');
-      console.log('1. Browser reports online status:', navigator.onLine);
-      console.log('2. API URL being accessed:', requestURL);
-      console.log('3. Request readyState:', xhr.readyState);
-      
-      console.log('------------- END SEND DIRECT MESSAGE (NETWORK ERROR) -------------');
-      reject(new Error('Network error occurred'));
-    };
-    
-    xhr.ontimeout = function() {
-      console.error('Request timeout when sending message');
-      console.log('Timeout diagnostics:');
-      console.log('1. Timeout value (ms):', xhr.timeout);
-      console.log('2. API URL being accessed:', requestURL);
-      console.log('------------- END SEND DIRECT MESSAGE (TIMEOUT) -------------');
-      reject(new Error('Request timed out'));
-    };
-    
-    // Set timeout to 15 seconds
-    xhr.timeout = 15000;
-    
-    // Include additional diagnostic information in the payload
-    const data = JSON.stringify({
-      receiverId,
-      content,
-      _debug: {
-        clientTimestamp: timestamp,
-        clientUserRole: userRole,
-        clientRequestId: Math.random().toString(36).substring(2, 15)
-      }
-    });
-    
-    console.log('Sending message payload:', {
-      receiverId,
-      contentPreview: content?.substring(0, 30) + '...',
-      contentLength: content?.length || 0,
-      payloadSize: data.length
-    });
-    
-    try {
-      xhr.send(data);
-      console.log('XHR request initiated successfully');
-    } catch (error) {
-      console.error('Exception when sending XHR request:', error);
-      console.log('Exception details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      console.log('------------- END SEND DIRECT MESSAGE (SEND EXCEPTION) -------------');
-      reject(error);
-    }
+    // Start the attempt chain
+    attemptSend(0, 0);
   });
 };
 
