@@ -3,24 +3,39 @@ const Payment = require('../models/payment');
 
 class NotificationService {
     constructor() {
-        this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT,
-            secure: true,
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            }
-        });
+        // Check if SMTP environment variables are set
+        if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
+            this.transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
+                secure: process.env.SMTP_PORT === '465',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+            this.emailConfigured = true;
+        } else {
+            console.warn('SMTP not configured. Email notifications will be disabled.');
+            this.emailConfigured = false;
+        }
     }
 
     async sendPaymentNotification(payment) {
         try {
+            // Skip sending email if not configured
+            if (!this.emailConfigured) {
+                console.log('Email notification skipped: SMTP not configured');
+                return false;
+            }
+            
             const subject = this.getPaymentSubject(payment);
             const html = this.getPaymentEmailTemplate(payment);
 
+            const from = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@mnit-laundry.com';
+            
             await this.transporter.sendMail({
-                from: process.env.SMTP_FROM,
+                from: from,
                 to: payment.student.email,
                 subject,
                 html
