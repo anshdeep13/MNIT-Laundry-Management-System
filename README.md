@@ -1,6 +1,9 @@
 # MNIT Laundry Management System
-
+      
 A comprehensive laundry management system for MNIT hostel residents.
+
+## TEAM PROJECT
+   This project was developed collabaratively by group of 3 students.
 
 ## Features
 
